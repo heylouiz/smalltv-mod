@@ -385,6 +385,9 @@
 #define DEFAULT_NIGHT_END_MIN   420       // 07:00
 #define DEFAULT_NIGHT_LEVEL     0         // 0..100, 0 = backlight fully off
 
+// --- Location (device-wide; theme {lat}/{lon}/{CITY}) ---
+#define LOCATION_CITY_MAX       32        // chars kept of the display name
+
 // Night-mode NTP trust: only ENTER night mode when the clock was confirmed by a
 // successful NTP sync within NIGHT_NTP_TRUST_MS (else we assume the clock may be
 // wrong and keep the screen on). While inside the window but unconfirmed, re-arm

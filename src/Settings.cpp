@@ -184,6 +184,33 @@ void ClockSettings::fromJson(JsonObjectConst o) {
 }
 
 // ===========================================================================
+// Location slice
+// ===========================================================================
+void LocationSettings::setDefaults() {
+  city = "";
+  lat = 0.0f;
+  lon = 0.0f;
+}
+
+void LocationSettings::toJson(JsonObject o) const {
+  o["city"] = city;
+  o["lat"]  = lat;
+  o["lon"]  = lon;
+}
+
+void LocationSettings::fromJson(JsonObjectConst o) {
+  if (o["city"].is<const char*>()) {
+    // The theme font is printable ASCII only; the web UI already folds accents,
+    // this keeps a hand-written POST from putting anything else on screen.
+    city = "";
+    for (const char* p = o["city"].as<const char*>(); *p && city.length() < LOCATION_CITY_MAX; ++p)
+      if (*p >= 32 && *p <= 126) city += *p;
+  }
+  if (o["lat"].is<float>() || o["lat"].is<int>()) lat = constrain(o["lat"].as<float>(), -90.0f, 90.0f);
+  if (o["lon"].is<float>() || o["lon"].is<int>()) lon = constrain(o["lon"].as<float>(), -180.0f, 180.0f);
+}
+
+// ===========================================================================
 // Web UI password slice
 // ===========================================================================
 void AuthSettings::setDefaults() {
@@ -447,6 +474,7 @@ void Settings::setDefaults() {
   radar.setDefaults();
   ha.setDefaults();
   clock.setDefaults();
+  location.setDefaults();
   display.setDefaults();
   wg.setDefaults();
   auth.setDefaults();
@@ -536,6 +564,7 @@ void settingsToJson(const Settings& s, JsonObject root, bool includeSecrets) {
   s.radar.toJson(root["radar"].to<JsonObject>());
   s.ha.toJson(root["ha"].to<JsonObject>(), includeSecrets);
   s.clock.toJson(root["clock"].to<JsonObject>());
+  s.location.toJson(root["location"].to<JsonObject>());
   s.display.toJson(root["display"].to<JsonObject>());
   s.wg.toJson(root["wg"].to<JsonObject>(), includeSecrets);
   s.auth.toJson(root["auth"].to<JsonObject>(), includeSecrets);
@@ -626,6 +655,7 @@ void settingsApplyJson(Settings& s, JsonObjectConst root) {
   // HA has no legacy flat layout either; only apply when its object is present.
   if (root["ha"].is<JsonObjectConst>()) s.ha.fromJson(root["ha"].as<JsonObjectConst>());
   if (root["clock"].is<JsonObjectConst>()) s.clock.fromJson(root["clock"].as<JsonObjectConst>());
+  if (root["location"].is<JsonObjectConst>()) s.location.fromJson(root["location"].as<JsonObjectConst>());
   if (root["display"].is<JsonObjectConst>()) s.display.fromJson(root["display"].as<JsonObjectConst>());
   if (root["wg"].is<JsonObjectConst>()) s.wg.fromJson(root["wg"].as<JsonObjectConst>());
   if (root["auth"].is<JsonObjectConst>()) s.auth.fromJson(root["auth"].as<JsonObjectConst>());

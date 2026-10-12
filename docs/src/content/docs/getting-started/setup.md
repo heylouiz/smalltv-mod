@@ -38,6 +38,10 @@ The mode selector, which lists each feature under the same name as its tab (Tick
 
 Per-channel Red, Green, and Blue gain (50 to 150 percent, 100 being the untouched image), a colour-order switch for panels that show red and blue swapped, and an invert toggle for panels that come up looking like a negative. These exist because the units do not all carry the same panel: two devices running this firmware side by side can render the same colour visibly differently. Changes apply as soon as you save.
 
+#### Location
+
+The "Location" card tells themes where the device is. Type a city and press Search: the browser looks the name up with the free Open-Meteo geocoding service and lists the matches, and picking one fills the name and coordinates. Without internet on the computer or phone you are using, type the latitude and longitude instead. Themes show the name with the `{CITY}` token and fetch data for the coordinates with `{lat}` and `{lon}` in their URLs (see [Theme clocks](/smalltv-mod/features/themes/)). Accents are dropped from the name, because the theme font is plain ASCII. The plane radar keeps its own position in its tab. The card is hidden in images built without theme clocks.
+
 #### Clock and night mode
 
 The "Clock & night mode" card sets a timezone by IANA name (`Europe/Rome`, `Europe/Zurich`, `America/New_York`, and so on) from a dropdown; DST is handled automatically. Enabling the nightly window adds a From and To time (HH:MM) and a night brightness, where 0 turns the backlight fully off and any other value just dims it. Night mode is off by default. The device keeps rendering behind the dimmed or off backlight rather than sleeping, so WiFi, the web UI, and usage push stay up throughout.

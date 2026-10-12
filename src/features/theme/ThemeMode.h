@@ -35,6 +35,7 @@ class ThemeMode : public DisplayMode {
   const String& error() const { return error_; }
  private:
   void unload();
+  void applyLocation(const Settings&);
   void refreshData();
   smalltv::Engine engine_;
   std::unique_ptr<ThemeFile> file_;
@@ -45,7 +46,9 @@ class ThemeMode : public DisplayMode {
   std::vector<smalltv::ThemeValue> dataValues_;
   smalltv::DataRequests dataRequests_;
   size_t dataCursor_ = 0;
-  bool attempted_ = false, messageDrawn_ = false;
+  smalltv::Location location_;
+  String city_;
+  bool attempted_ = false, messageDrawn_ = false, locationApplied_ = false;
 };
 extern ThemeMode g_themeMode;
 #endif

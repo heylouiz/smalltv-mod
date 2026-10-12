@@ -180,6 +180,21 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
    <input id="nightLevel" type="range" min="0" max="100" oninput="nlVal.textContent=this.value">
    <small class="hint">Needs internet once to set the clock over NTP. The timezone also applies to theme clocks. While the window is active it overrides the brightness and auto-brightness above. Times are local to the selected timezone; DST is handled automatically. After a reboot the schedule resumes once the clock re-syncs, so the screen may show normal brightness for a few seconds.</small>
   </div>
+  <div class="card" id="locCard"><h2>Location</h2>
+   <label>Find a city</label>
+   <div class="row">
+    <div><input id="locQuery" placeholder="Campinas" onkeydown="if(event.key==='Enter'){event.preventDefault();locSearch()}"></div>
+    <div style="flex:0 0 auto"><button class="btn sec" onclick="locSearch()">Search</button></div>
+   </div>
+   <div id="locResults"></div>
+   <label>City name on screen</label>
+   <input id="locCity" maxlength="32">
+   <div class="row">
+    <div><label>Latitude</label><input id="locLat" type="number" step="0.0001" placeholder="-22.9056"></div>
+    <div><label>Longitude</label><input id="locLon" type="number" step="0.0001" placeholder="-47.0608"></div>
+   </div>
+   <small class="hint">Themes show the city with {CITY} and fetch data for these coordinates with {lat} and {lon} in their URLs, for example a weather source. The search runs in this browser through the free Open-Meteo geocoding service, so the device never needs to look the name up; without internet here, type the coordinates instead. Accents are dropped from the name because the theme font is plain ASCII. The plane radar keeps its own position in its tab.</small>
+  </div>
  </section>
 
  <!-- TICKER (feature) -->
@@ -443,7 +458,7 @@ function resetColors(){setGain('rGain','rgVal',100);setGain('gGain','ggVal',100)
 function loadConfig(){return j('/api/config').then(function(c){C=c;
  var f=c.features||{}; ['ticker','usage','radar','ha'].forEach(function(k){if(f[k]===false)hideFeat(k)});
  // WireGuard is only built for the chips with room for it; drop the card otherwise
- if(f.theme!==true){hideFeat('theme');var tc=$('themeCard');if(tc)tc.remove()}else{loadThemes()}
+ if(f.theme!==true){hideFeat('theme');var tc=$('themeCard');if(tc)tc.remove();var lcd=$('locCard');if(lcd)lcd.remove()}else{loadThemes()}
  if(f.wireguard===false){var wc=$('wgCard'); if(wc)wc.remove()}
  var w=c.wg||{};
  sc('wgEnabled',!!w.enabled); sv('wgPeerPublicKey',w.peerPublicKey);
@@ -472,6 +487,9 @@ function loadConfig(){return j('/api/config').then(function(c){C=c;
  sv('tz',ck.tz||''); sc('nightEnabled',!!ck.nightEnabled);
  sv('nightStart',ck.nightStart||'22:00'); sv('nightEnd',ck.nightEnd||'07:00');
  sv('nightLevel',ck.nightLevel!=null?ck.nightLevel:0); $('nlVal')&&($('nlVal').textContent=(ck.nightLevel!=null?ck.nightLevel:0));
+ // location slice (0,0 = not set)
+ var lc=c.location||{}, lcSet=!!(lc.lat||lc.lon);
+ sv('locCity',lc.city||''); sv('locLat',lcSet?lc.lat:''); sv('locLon',lcSet?lc.lon:'');
  $('mode').value=c.mode||'stocks'; modeChanged();
  sv('carouselSec',c.carouselSec||30);
  sc('carouselTicker',c.carouselTicker!==false); sc('carouselUsage',c.carouselUsage!==false); sc('carouselRadar',c.carouselRadar!==false);
@@ -617,6 +635,8 @@ function collect(){
   o.clock={tz:_tzn,tzPosix:_tzp,
   nightEnabled:gc('nightEnabled'),nightStart:gv('nightStart')||'22:00',
   nightEnd:gv('nightEnd')||'07:00',nightLevel:parseInt(gv('nightLevel'))||0};}
+ // location slice
+ if($('locCity')) o.location={city:asciiFold(gv('locCity').trim()),lat:parseFloat(gv('locLat'))||0,lon:parseFloat(gv('locLon'))||0};
  // radar slice
  if($('radar')){
   var r={lat:parseFloat(gv('radarLat'))||0, lon:parseFloat(gv('radarLon'))||0,
@@ -684,6 +704,25 @@ function addApRow(o){var t=$('apTable');var tr=document.createElement('tr');tr.c
   '<td style="width:34px"><button class="btn sec" style="padding:6px 10px" onclick="this.closest(\'tr\').remove()">&times;</button></td>';
  t.appendChild(tr);}
 function addAp(){if(document.querySelectorAll('#apTable tr').length>=6){toast('Max 6');return}addApRow({})}
+
+// location: the browser resolves a city name with Open-Meteo's geocoding API
+// (CORS-enabled, no key); the device only stores the chosen name and coordinates.
+var LOC_HITS=[];
+function asciiFold(s){return (''+s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7e]/g,'').slice(0,32)}
+function locSearch(){var q=gv('locQuery').trim();if(!q){toast('Type a city name');return}
+ $('locResults').innerHTML='<div class="muted">Searching...</div>';
+ fetch('https://geocoding-api.open-meteo.com/v1/search?count=5&format=json&name='+encodeURIComponent(q)+
+  '&language='+encodeURIComponent((navigator.language||'en').slice(0,2)))
+ .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
+ .then(function(d){LOC_HITS=d.results||[];var h='';
+  LOC_HITS.forEach(function(p,i){h+='<div class="net" onclick="locPick('+i+')"><span>'+
+   esc([p.name,p.admin1,p.country].filter(Boolean).join(', '))+'</span><span class="muted">'+
+   p.latitude.toFixed(2)+', '+p.longitude.toFixed(2)+'</span></div>'});
+  $('locResults').innerHTML=h||'<div class="muted">No places found</div>';})
+ .catch(function(e){$('locResults').innerHTML='<div class="muted">Search failed ('+esc(e.message)+'); type the coordinates instead</div>'})}
+function locPick(i){var p=LOC_HITS[i];if(!p)return;
+ sv('locCity',asciiFold(p.name));sv('locLat',p.latitude.toFixed(4));sv('locLon',p.longitude.toFixed(4));
+ $('locResults').innerHTML='';toast('Save settings to apply')}
 
 // wifi scan
 function scan(){$('scanList').innerHTML='<div class="muted">Scanning...</div>';

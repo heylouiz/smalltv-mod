@@ -39,7 +39,7 @@ def main():
     preview.add_argument('--fps', type=int, default=15, help='Preview sampling rate, 1..15 (default: 15)')
     preview.add_argument('--time', help='Local wall time, e.g. 2026-09-18T10:24:00 (default: computer time)')
     preview.add_argument('--data', action='append', default=[], metavar='KEY=VALUE',
-                         help='Inject a declared data value into every preview frame')
+                         help='Inject a declared data value, or CITY=<name> for {CITY}, into every preview frame')
     args = parser.parse_args()
     try:
         with tempfile.TemporaryDirectory() as scratch:

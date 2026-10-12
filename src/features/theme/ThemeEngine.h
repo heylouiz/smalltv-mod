@@ -124,7 +124,18 @@ struct Theme {
   std::vector<Layer> layers;
   std::vector<ThemeDataSource> data;
 };
+// The device location a data URL's {lat}/{lon} placeholders resolve to; the
+// device's configured city reaches text layers as the {CITY} token, through a
+// ThemeValue keyed CityKey.
+struct Location {
+  bool set = false;
+  double lat = 0, lon = 0;
+};
+constexpr const char* CityKey = "CITY";
 bool parseTheme(const std::string& json, Theme& out, std::string& error);
+// Fills the {lat}/{lon} placeholders of a validated data URL. False when the
+// URL uses one and no location is set, so the caller skips that fetch.
+bool expandDataUrl(const std::string& url, const Location& location, std::string& out);
 std::string expandText(const std::string& value, const tm* time);
 std::string expandText(const std::string& value, const tm* time, const std::vector<ThemeValue>& values);
 std::string assetPath(const Layer& layer, uint16_t frame);
