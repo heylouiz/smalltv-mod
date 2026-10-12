@@ -28,17 +28,39 @@ Visual authoring is provided by the separate
 firmware repository keeps the format, validator, packer, and offline preview
 tools so themes remain reproducible in CI without the editor application.
 
+### Built-in clock and crash recovery
+
+The list always starts with **Built-in clock**: the time and the device's IP
+address, drawn by the firmware itself without a package. It is shown when no
+theme is selected, it can be selected like any other theme, and it cannot be
+removed.
+
+It is also the fallback. A theme that needs more memory than the device has
+free can crash it, and before this the device would load the same theme on
+every boot and crash again, too quickly to reach the settings page. Now the
+firmware notes when a user theme is active (and while a package is validated)
+in memory that survives a restart. If the device then restarts because of a
+crash, it turns that theme off, saves the built-in clock as the selection, and
+boots normally. The screen reads **THEME TURNED OFF** with the theme's ID until
+another theme is selected, and the Theme clocks card says which theme crashed.
+The package stays installed: remove it, or install a smaller version.
+
+The firmware cannot tell a theme's crash from an unrelated one while the theme
+is on screen, so any crash in that time turns the theme off. Select it again to
+bring it back.
+
 Notifications keep their existing behavior and cover the active theme. When the
 notification ends, the theme is restored with the current time and animation
 frame. Theme mode is selected directly; it is not part of the mode carousel in V1.
 
 Use **Remove** to delete an inactive theme. To replace the currently selected
-package, first choose another display mode and **Save settings**, remove the old
-package, then install the replacement. Duplicate installed IDs are rejected.
+package, first select **Built-in clock** (or choose another display mode and
+**Save settings**), remove the old package, then install the replacement. Duplicate installed IDs are rejected.
 Unreadable or invalid packages remain listed with their filename ID, size, and
 validation error. **Use theme** is disabled for them, but **Remove** remains
 available, including when a corrupt package was selected. Removing that package
-clears the saved selection; install or select a valid theme to resume the clock.
+clears the saved selection, and the built-in clock is shown until another theme
+is selected.
 Up to 16 packages can coexist, subject to available filesystem space. Firmware
 updates do not require reinstalling packages. Settings export contains the selected
 ID, not the package files; keep your source themes and `.stheme` files separately.
@@ -525,10 +547,10 @@ upload callbacks. Responses are JSON; failures contain `error`.
 
 | Method and route | Request / result |
 | --- | --- |
-| `GET /api/themes` | All installed packages with `valid`, `error`, filename-derived `id`, metadata, bytes; selected ID, free bytes, renderer error |
+| `GET /api/themes` | The built-in clock first (`id: ""`, `builtin: true`), then all installed packages with `valid`, `error`, filename-derived `id`, metadata, bytes; selected ID, free bytes, renderer error; `recovered` (the ID of the theme turned off) only after a boot that recovered from a theme crash |
 | `POST /api/themes/install` | One multipart file; returns `201` and `{ "id": "..." }` |
-| `POST /api/themes/select` | JSON `{ "id": "..." }`; validates, saves, activates, starts NTP |
-| `POST /api/themes/delete` | JSON `{ "id": "..." }`; rejects deletion of a valid active theme; permits removal of a corrupt selected package |
+| `POST /api/themes/select` | JSON `{ "id": "..." }`; validates, saves, activates, starts NTP. `{ "id": "" }` selects the built-in clock |
+| `POST /api/themes/delete` | JSON `{ "id": "..." }`; rejects deletion of a valid active theme and of the built-in clock; permits removal of a corrupt selected package |
 
 Invalid uploads return 400; duplicate IDs and valid active-theme deletion return 409; missing
 themes return 404. The normal settings JSON also exposes `mode: "theme"` and
