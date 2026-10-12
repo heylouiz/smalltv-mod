@@ -72,7 +72,8 @@ std::vector<smalltv::ThemeValue> injectedValues(const smalltv::Theme& theme,char
     size_t eq=arg.find('=');
     if(eq==std::string::npos||eq==0)throw std::runtime_error("Expected KEY=VALUE: "+arg);
     std::string key=arg.substr(0,eq),value=arg.substr(eq+1);
-    if(!declaredDataField(theme,key))throw std::runtime_error("Undeclared data key: "+key);
+    // CITY stands in for the device's configured city ({CITY} text token).
+    if(key!=smalltv::CityKey&&!declaredDataField(theme,key))throw std::runtime_error("Undeclared data key: "+key);
     for(const auto& existing:values) if(existing.key==key)throw std::runtime_error("Duplicate data key: "+key);
     if(values.size()==MaxInjectedValues)throw std::runtime_error("Expected at most 32 injected values");
     values.push_back({key,value});
