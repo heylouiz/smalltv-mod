@@ -12,11 +12,11 @@
 // Firmware identity
 // ---------------------------------------------------------------------------
 #define FW_NAME     "smalltv-mod"
-#define FW_VERSION  "2.16.0"
+#define FW_VERSION  "2.16.1"
 
 // Project / update references (shown in the web UI; used by the GitHub self-update)
-#define REPO_URL      "https://github.com/giovi321/smalltv-mod"
-#define REPO_OWNER    "giovi321"
+#define REPO_URL      "https://github.com/heylouiz/smalltv-mod"
+#define REPO_OWNER    "heylouiz"
 #define REPO_NAME     "smalltv-mod"
 // Release asset the GitHub self-updater pulls, and the short variant name shown
 // in the web UI. One app image per target, plus a second one for the two boards
@@ -41,6 +41,9 @@
 #elif defined(SMALLTV_ESP32)
   #define UPDATE_ASSET "smalltv-mod-firmware-esp32.bin"
   #define FW_VARIANT   "esp32"
+#elif defined(SMALLTV_THEME)
+  #define UPDATE_ASSET "smalltv-mod-firmware-theme.bin"
+  #define FW_VARIANT   "esp8266-theme"
 #elif defined(SMALLTV_LEAN)
   #define UPDATE_ASSET "smalltv-mod-firmware-lean.bin"
   #define FW_VARIANT   "esp8266-lean"
