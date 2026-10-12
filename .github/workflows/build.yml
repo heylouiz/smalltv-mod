@@ -85,8 +85,10 @@ jobs:
       - name: Install PlatformIO
         run: pip install platformio==6.1.19
 
-      - name: Build firmware (all targets)
-        run: pio run -e smalltv -e smalltv_lean -e smalltv_c2 -e smalltv_esp32 -e smalltv_esp32_wg -e smalltv_esp32_8mb -e smalltv_loader
+      # This fork ships one image: the ESP8266 theme-clocks build. The other
+      # envs still exist in platformio.ini for local builds.
+      - name: Build firmware (theme-only ESP8266)
+        run: pio run -e smalltv_theme
 
       - name: Test theme engine and packer
         run: |
@@ -98,46 +100,29 @@ jobs:
           cmp examples/themes/terminal-ops.stheme /tmp/terminal-ops.stheme
           python3 tools/theme_pack.py examples/themes/live-status /tmp/live-status.stheme
           cmp examples/themes/live-status.stheme /tmp/live-status.stheme
-          sh tests/theme/run.sh
+          THEME_LIBDEPS=.pio/libdeps/smalltv_theme sh tests/theme/run.sh
           node tests/theme/test_webui.js
 
       # Host-native, not board-specific: only needs ArduinoJson, which the
       # firmware build above already fetched into .pio/libdeps.
       - name: Test atomic settings storage
         run: |
-          c++ -std=c++11 -Wall -Wextra -Werror -g -Isrc -I.pio/libdeps/smalltv_esp32_8mb/ArduinoJson/src \
+          c++ -std=c++11 -Wall -Wextra -Werror -g -Isrc -I.pio/libdeps/smalltv_theme/ArduinoJson/src \
             tests/test_storage.cpp -o /tmp/smalltv-storage-tests
           /tmp/smalltv-storage-tests
 
-      # One app image per target (web-UI OTA + GitHub self-update), the merged
-      # factory images for first-time USB flashing of the ESP32 boards, and the
-      # minimal loader used to install onto a SmallTV-ultra. Two boards get a
-      # second app image: the ESP8266 gets -lean, with Home Assistant and the
-      # usage meter compiled out, and the NM-TV-154 gets -esp32-wg, with the
-      # WireGuard client compiled in. UPDATE_ASSET in src/config.h maps each
-      # build back to its own file name so self-update keeps a device on the
-      # variant it runs.
-      # always() with a tolerant copy, for the same reason as the upload below:
-      # when one env dies the other six still built, and those binaries are
-      # usually what the next question needs. A missing file is a warning here,
-      # not a reason to hand over nothing. The build step's own exit status still
-      # decides whether the run is red.
+      # One app image: the theme-only ESP8266 build, used for both the web-UI
+      # manual upload and the GitHub self-update (UPDATE_ASSET in src/config.h
+      # names this file for the SMALLTV_THEME variant).
+      # always() with a tolerant copy: a run that dies after linking still hands
+      # over the binary. The build step's own exit status decides whether the
+      # run is red.
       - name: Stage artifacts
         if: always()
         run: |
           mkdir -p dist
           copy() { [ -f "$1" ] && cp "$1" "$2" || echo "missing: $1"; }
-          copy .pio/build/smalltv/firmware.bin dist/smalltv-mod-firmware.bin
-          copy .pio/build/smalltv_lean/firmware.bin dist/smalltv-mod-firmware-lean.bin
-          copy .pio/build/smalltv_c2/firmware.bin dist/smalltv-mod-firmware-c2.bin
-          copy .pio/build/smalltv_c2/firmware.factory.bin dist/smalltv-mod-firmware-c2.factory.bin
-          copy .pio/build/smalltv_esp32/firmware.bin dist/smalltv-mod-firmware-esp32.bin
-          copy .pio/build/smalltv_esp32/firmware.factory.bin dist/smalltv-mod-firmware-esp32.factory.bin
-          copy .pio/build/smalltv_esp32_wg/firmware.bin dist/smalltv-mod-firmware-esp32-wg.bin
-          copy .pio/build/smalltv_esp32_wg/firmware.factory.bin dist/smalltv-mod-firmware-esp32-wg.factory.bin
-          copy .pio/build/smalltv_esp32_8mb/firmware.bin dist/smalltv-mod-firmware-esp32-pro.bin
-          copy .pio/build/smalltv_esp32_8mb/firmware.factory.bin dist/smalltv-mod-firmware-esp32-pro.factory.bin
-          copy .pio/build/smalltv_loader/firmware.bin dist/smalltv-mod-loader.bin
+          copy .pio/build/smalltv_theme/firmware.bin dist/smalltv-mod-firmware-theme.bin
 
       # always(), so a run that dies after linking still hands over whatever was
       # produced. A size question cannot be answered from a red run with no

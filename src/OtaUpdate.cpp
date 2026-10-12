@@ -17,11 +17,13 @@ static uint16_t probeMfln(const char* host) {
 }
 #endif
 
-// "a.b.c" -> a*10000 + b*100 + c, for a simple newer-than comparison.
+// "a.b.c[-hl.d]" -> (a*10000 + b*100 + c)*1000 + d, for a simple newer-than
+// comparison. a.b.c is the upstream release the fork is based on and d the
+// fork's own build counter on top of it; a plain "a.b.c" counts as d = 0.
 static long verNum(const char* v) {
-  int a = 0, b = 0, c = 0;
-  sscanf(v, "%d.%d.%d", &a, &b, &c);
-  return (long)a * 10000 + (long)b * 100 + c;
+  int a = 0, b = 0, c = 0, d = 0;
+  sscanf(v, "%d.%d.%d-hl.%d", &a, &b, &c, &d);
+  return ((long)a * 10000 + (long)b * 100 + c) * 1000 + d;
 }
 
 OtaLatest otaCheckLatest(const Settings& s) {
