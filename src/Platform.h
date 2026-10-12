@@ -9,6 +9,15 @@
 #include <Arduino.h>
 #include <time.h>
 
+// ---- Reset breadcrumbs (Platform.cpp) ----------------------------------------
+// One word of flags that survives a crash, a watchdog or a software reset but
+// not a power cut (RTC memory on the ESP8266, .noinit RAM on the ESP32). setup()
+// reads it to learn what was running when the chip went down, then clears it.
+// The top bit belongs to the platform; features own the low bits.
+constexpr uint32_t KEEP_CRASHED = 1u << 31;   // ESP8266 crash handler ran (panic/abort/OOM)
+uint32_t platformKeepRead();
+void     platformKeepWrite(uint32_t flags);
+
 #if defined(SMALLTV_ESP32C2) || defined(SMALLTV_ESP32)
 // ================== ESP32 family (C2/ESP8684 + classic ESP32) ==================
 #include <WiFi.h>
@@ -102,15 +111,23 @@ static inline String platformUpdateError() { return Update.getErrorString(); }
 static inline uint32_t platformChipId() { return ESP.getChipId(); }
 
 // Reset / crash info from the ESP8266 boot ROM (Xtensa exception PC + fault addr).
+// The ROM only records exceptions and watchdogs. A panic, abort() or a failed
+// `new` (out of memory) restarts the chip as an ordinary "Software/System
+// restart", indistinguishable from ESP.restart(), so the crash handler in
+// Platform.cpp leaves KEEP_CRASHED behind for those.
 struct PlatformReset { String reason; bool wasCrash; char epc[16]; char addr[16]; };
 static inline PlatformReset platformResetInfo() {
   PlatformReset r; r.wasCrash = false; r.epc[0] = 0; r.addr[0] = 0;
   r.reason = ESP.getResetReason();
   struct rst_info* ri = ESP.getResetInfoPtr();
-  if (ri && ri->reason == REASON_EXCEPTION_RST) {
+  if (ri && (ri->reason == REASON_EXCEPTION_RST || ri->reason == REASON_SOFT_WDT_RST ||
+             ri->reason == REASON_WDT_RST)) {
     r.wasCrash = true;
     snprintf(r.epc,  sizeof(r.epc),  "0x%08x", (unsigned)ri->epc1);
     snprintf(r.addr, sizeof(r.addr), "0x%08x", (unsigned)ri->excvaddr);
+  } else if (platformKeepRead() & KEEP_CRASHED) {
+    r.wasCrash = true;
+    r.reason = "Panic/abort (e.g. out of memory)";
   }
   return r;
 }
