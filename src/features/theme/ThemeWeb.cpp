@@ -137,6 +137,7 @@ void finishUpload() {
   std::string error;
   bool valid = false;
   {
+    ThemeCrashScope guard;
     ThemeFile file;
     if (file.open(staging)) {
       smalltv::Package package(file);
@@ -165,7 +166,8 @@ void finishUpload() {
   resetUpload();
 }
 // Shared by select/delete: reads a JSON body's `id` and validates it as a
-// well-formed theme ID before either route touches the filesystem.
+// well-formed theme ID before either route touches the filesystem. An empty
+// `id` names the built-in theme, which has no file.
 // `id.length() != strlen(id.c_str())` catches an embedded NUL byte ArduinoJson
 // would otherwise pass through silently.
 bool requestId(String& id) {
@@ -179,6 +181,7 @@ bool requestId(String& id) {
     return false;
   }
   id = doc["id"].as<String>();
+  if (id.isEmpty()) return true;
   if (!smalltv::validId(id.c_str()) || id.length() != strlen(id.c_str())) {
     reply(400, "Invalid theme ID");
     return false;
@@ -188,14 +191,25 @@ bool requestId(String& id) {
 // GET /api/themes: every installed package's metadata and validity, without
 // requiring any of them to be the currently active theme -- inspectInstalledTheme()
 // runs the same validator a selection would use, so an invalid or corrupt
-// package still gets listed (with its error), just not selectable.
+// package still gets listed (with its error), just not selectable. The
+// built-in theme comes first, with an empty `id`; `recovered` is present only
+// after a boot that turned a crashing theme off (its ID, or empty when the
+// crash came from validating an upload).
 void listThemes() {
   if (!auth()) return;
+  ThemeCrashScope guard;
   JsonDocument doc;
   doc["selected"] = settings->themeId;
   doc["error"] = g_themeMode.error();
   doc["freeBytes"] = freeBytes();
+  if (g_themeMode.recovered()) doc["recovered"] = g_themeMode.recoveredId();
   JsonArray list = doc["themes"].to<JsonArray>();
+  JsonObject builtin = list.add<JsonObject>();
+  builtin["id"] = "";
+  builtin["name"] = "Built-in clock";
+  builtin["builtin"] = true;
+  builtin["valid"] = true;
+  builtin["bytes"] = 0;
   File dir = LittleFS.open("/themes", "r");
   unsigned count = 0;
   for (File entry = dir.openNextFile(); entry && count < MaxThemes; entry = dir.openNextFile()) {
@@ -232,7 +246,8 @@ void selectTheme() {
   if (!auth()) return;
   String id;
   if (!requestId(id)) return;
-  {
+  if (id.length()) {
+    ThemeCrashScope guard;
     ThemeFile file;
     smalltv::Theme theme;
     std::string error;
@@ -256,6 +271,7 @@ void selectTheme() {
     reply(500, "Could not save selection");
     return;
   }
+  g_themeMode.clearRecovered();
   clockReapply(*settings);
   appInvalidate();
   reply(200, id);
@@ -268,6 +284,10 @@ void deleteTheme() {
   if (!auth()) return;
   String id;
   if (!requestId(id)) return;
+  if (id.isEmpty()) {
+    reply(400, "The built-in theme cannot be removed");
+    return;
+  }
   String path = "/themes/" + id + ".stheme";
   if (!LittleFS.exists(path)) {
     reply(404, "Theme not found");
@@ -276,6 +296,7 @@ void deleteTheme() {
   if (settings->themeId == id && settings->mode == MODE_THEME) {
     ThemeFile file;
     file.open(path);
+    ThemeCrashScope guard;
     auto info = smalltv::inspectInstalledTheme(file, id.c_str());
     if (info.valid) {
       reply(409, "Switch away from theme mode before removing this theme");

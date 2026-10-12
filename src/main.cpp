@@ -170,7 +170,9 @@ void setup() {
   PlatformReset pr = platformResetInfo();
   Serial.print("[boot] reset reason: ");
   Serial.println(pr.reason);
-  platformKeepWrite(0);   // read above by platformResetInfo(); start clean
+  // What was running when the chip went down; read once, then start clean.
+  uint32_t keep = platformKeepRead();
+  platformKeepWrite(0);
 
   if (pr.wasCrash) {
     g_safeMode = true;                   // crashed last boot -> stay out of the crash path
@@ -187,6 +189,17 @@ void setup() {
   Serial.println("[boot] settings");
   settingsBegin();
   loadSettings(g_settings);
+#if WITH_THEME
+  // A crash with a user theme active is the theme's: turn it off and boot
+  // normally into the built-in clock, rather than into safe mode (or, before
+  // this, straight back into the same theme and the same crash).
+  if (pr.wasCrash && themeRecoverAfterCrash(g_settings, keep)) {
+    Serial.println("[boot] theme crashed last boot -> built-in clock");
+    g_safeMode = false;
+  }
+#else
+  (void)keep;
+#endif
 
   Serial.println("[boot] display");
   gfxBegin(g_settings);

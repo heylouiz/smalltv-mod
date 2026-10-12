@@ -134,12 +134,12 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
   <div class="card" id="themeCard"><h2>Theme clocks</h2>
    <label>Installed theme</label><select id="themeSelect" onchange="themeChoiceChanged()"></select>
    <div style="margin-top:12px"><button class="btn" id="themeUseBtn" onclick="selectTheme()">Use theme</button>
-    <button class="btn" onclick="deleteTheme()">Remove</button></div>
+    <button class="btn" id="themeRemoveBtn" onclick="deleteTheme()">Remove</button></div>
    <small class="hint" id="themeDetails"></small>
    <label>Install a theme</label><input id="themeFile" type="file" accept=".stheme">
    <button class="btn" id="themeUploadBtn" onclick="installTheme()">Install .stheme</button>
    <small class="hint" id="themeStatus">Loading themes…</small>
-   <small class="hint">Theme clocks use the timezone below. Install a package, then choose Use theme. Notifications continue to appear above it.</small>
+   <small class="hint">Theme clocks use the timezone below. Install a package, then choose Use theme. Notifications continue to appear above it. If a theme crashes the device, it is turned off and the built-in clock comes back.</small>
   </div>
   <div class="card"><h2>Screen</h2>
    <label>Brightness: <span id="brVal"></span>%</label>
@@ -849,19 +849,21 @@ var themeEntries=[];
 function themeChoiceChanged(){var select=$('themeSelect');if(!select)return;
  var theme=themeEntries.find(function(t){return t.id===select.value});
  $('themeUseBtn').disabled=!theme||theme.valid===false;
- $('themeDetails').textContent=!theme?'No theme selected':(theme.valid===false?'Invalid package: '+(theme.error||'Could not read theme')+' — remove it and install a corrected package.':theme.name+(theme.version?' · '+theme.version:'')+' · '+Math.ceil(theme.bytes/1024)+' KiB');
+ $('themeRemoveBtn').disabled=!theme||!!theme.builtin;
+ $('themeDetails').textContent=!theme?'No theme selected':theme.builtin?'Time and IP address · built in, always available':(theme.valid===false?'Invalid package: '+(theme.error||'Could not read theme')+' — remove it and install a corrected package.':theme.name+(theme.version?' · '+theme.version:'')+' · '+Math.ceil(theme.bytes/1024)+' KiB');
 }
 function loadThemes(){return j('/api/themes').then(function(d){
  var select=$('themeSelect');if(!select)return;select.textContent='';themeEntries=d.themes||[];
- themeEntries.forEach(function(t){var o=document.createElement('option');o.value=t.id;o.textContent=t.valid===false?t.id+' — invalid package':t.name+' — '+t.version;select.appendChild(o)});
- if(d.selected)select.value=d.selected;
- $('themeStatus').textContent=themeEntries.length+' installed · '+Math.floor(d.freeBytes/1024)+' KiB free'+(d.error?' · '+d.error:'');
+ themeEntries.forEach(function(t){var o=document.createElement('option');o.value=t.id;o.textContent=t.builtin?t.name:t.valid===false?t.id+' — invalid package':t.name+' — '+t.version;select.appendChild(o)});
+ select.value=d.selected||'';
+ var installed=themeEntries.filter(function(t){return !t.builtin}).length;
+ $('themeStatus').textContent=('recovered' in d?(d.recovered?'Theme “'+d.recovered+'” crashed the device and was turned off · ':'A theme crashed the device while it was being checked · '):'')+installed+' installed · '+Math.floor(d.freeBytes/1024)+' KiB free'+(d.error?' · '+d.error:'');
  themeChoiceChanged();
  }).catch(function(e){toast(e.message)})}
 function selectTheme(){var id=$('themeSelect').value;var theme=themeEntries.find(function(t){return t.id===id});
  if(!theme||theme.valid===false){toast('Choose a valid installed theme first');return}
  themeRequest('/api/themes/select',{id:id}).then(function(){C.mode='theme';C.themeId=id;sv('mode','theme');modeChanged();toast('Theme selected');loadThemes()}).catch(function(e){toast(e.message)})}
-function deleteTheme(){var id=$('themeSelect').value;if(!id)return;
+function deleteTheme(){var id=$('themeSelect').value;if(!id){toast('The built-in theme cannot be removed');return}
  themeRequest('/api/themes/delete',{id:id}).then(function(){toast('Theme removed');loadThemes()}).catch(function(e){toast(e.message)})}
 function installTheme(){var f=$('themeFile').files[0];if(!f){toast('Choose a .stheme package');return}
  var data=new FormData();data.append('theme',f);$('themeUploadBtn').disabled=true;$('themeStatus').textContent='Installing…';
