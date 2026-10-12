@@ -49,8 +49,32 @@ void ThemeMode::unload() {
   engine_.setValues({});
   engine_.setTheme(smalltv::Theme{}, millis());
   loadedId_ = "";
-  attempted_ = messageDrawn_ = false;
+  attempted_ = messageDrawn_ = locationApplied_ = false;
   error_ = "";
+}
+// Mirrors the device location into the loaded theme: the city reaches text
+// layers as the {CITY} value, and a moved location reschedules every source
+// at once, since their URLs may embed {lat}/{lon}. Cheap when nothing changed.
+void ThemeMode::applyLocation(const Settings& s) {
+  smalltv::Location location;
+  location.set = s.location.isSet();
+  location.lat = s.location.lat;
+  location.lon = s.location.lon;
+  bool moved = location.set != location_.set || location.lat != location_.lat || location.lon != location_.lon;
+  if (locationApplied_ && !moved && city_ == s.location.city) return;
+  if (locationApplied_ && moved) dataScheduled_.assign(dataScheduled_.size(), false);
+  location_ = location;
+  city_ = s.location.city;
+  locationApplied_ = true;
+  auto city = std::find_if(dataValues_.begin(), dataValues_.end(), [](const smalltv::ThemeValue& v) { return v.key == smalltv::CityKey; });
+  if (city_.length() == 0) {
+    if (city != dataValues_.end()) dataValues_.erase(city);   // {CITY} falls back to "--"
+  } else if (city == dataValues_.end()) {
+    dataValues_.push_back({smalltv::CityKey, city_.c_str()});
+  } else {
+    city->value = city_.c_str();
+  }
+  engine_.setValues(dataValues_);
 }
 // Collects a finished fetch (if any) and, with at most one request in flight
 // at a time, starts the next source whose interval has elapsed, round-robin
@@ -80,7 +104,14 @@ void ThemeMode::refreshData() {
     size_t i = (dataCursor_ + offset) % sources.size();
     if (dataScheduled_[i] && static_cast<int32_t>(millis() - dataNextMs_[i]) < 0) continue;
     auto request = dataRequests_.start(sources[i], i);
-    if (!startThemeDataFetch(request)) request->finish(false);
+    // A URL that needs {lat}/{lon} with no location set is skipped like a
+    // failed fetch; applyLocation() reschedules it once one is saved.
+    std::string url;
+    if (!smalltv::expandDataUrl(request->source.url, location_, url)) request->finish(false);
+    else {
+      request->source.url = std::move(url);
+      if (!startThemeDataFetch(request)) request->finish(false);
+    }
     dataScheduled_[i] = true;
     dataCursor_ = (i + 1) % sources.size();
     break;
@@ -131,6 +162,7 @@ void ThemeMode::service(const Settings& s) {
       dataScheduled_.assign(theme.data.size(), false);
       dataValues_.clear();
       dataCursor_ = 0;
+      locationApplied_ = false;
       engine_.setTheme(std::move(theme), millis());
       engine_.setValues(dataValues_);
       error_ = "";
@@ -143,6 +175,7 @@ void ThemeMode::service(const Settings& s) {
     }
     return;
   }
+  applyLocation(s);
   refreshData();
   tm t{};
   bool valid = clockNow(t);
