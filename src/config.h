@@ -144,6 +144,7 @@
 #define MODE_NOTIFY    4             // transient overlay: armed over HTTP, never persisted
 #define MODE_THEME     6             // declarative installed clock faces
 #define MODE_HA        5             // Home Assistant screens pushed over MQTT
+#define MODE_THEME2    7             // theme v2: compiled in the browser editor (STV2)
 #define DEFAULT_MODE MODE_STOCKS
 #define DEFAULT_CAROUSEL_SEC 30      // per-mode dwell in carousel
 
@@ -404,4 +405,12 @@
 // platformio.ini) to keep the heap headroom it exists to protect.
 #ifndef WITH_THEME
 #define WITH_THEME 1
+#endif
+// Theme v2 (browser editor + STV2 files). Needs WITH_THEME, whose built-in
+// clock is the fallback after a theme crash.
+#ifndef WITH_THEME2
+#define WITH_THEME2 0
+#endif
+#if WITH_THEME2 && !WITH_THEME
+#error "WITH_THEME2 needs WITH_THEME (the built-in clock fallback)"
 #endif

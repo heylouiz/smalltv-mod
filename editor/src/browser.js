@@ -149,3 +149,38 @@ export class Preview {
     this.timers = [];
   }
 }
+
+// ---- assets -------------------------------------------------------------------
+const loadedFonts = new Map();
+// Everything compileTheme() needs from the browser: each font loaded (Google
+// Fonts by name, or a URL) and rasterized for exactly the glyphs the theme
+// uses, and each image decoded (a preset drawn by code, or a URL/data URL).
+export async function buildAssets(source, requiredGlyphs, presets = {}) {
+  const need = requiredGlyphs(source);
+  const fonts = {}, images = {};
+  for (const [id, def] of Object.entries(source.fonts || {})) {
+    const family = def.google || def.family || id;
+    const weight = def.weight || 400;
+    const key = `${family}:${weight}:${def.url || ''}`;
+    if (!loadedFonts.has(key)) {
+      loadedFonts.set(key, def.url
+        ? fetch(def.url).then((r) => r.arrayBuffer()).then((b) => loadFontFile(family, b, weight))
+        : def.google ? loadGoogleFont(family, weight) : Promise.resolve());
+    }
+    await loadedFonts.get(key);
+    // '?' is the fallback glyph for characters the font was not given.
+    fonts[id] = rasterizeFont({ family, size: def.size || 16, weight }, [...(need[id] || []), 0x3f]);
+  }
+  for (const [id, def] of Object.entries(source.images || {})) {
+    let input = def.src;
+    if (def.preset) {
+      const draw = presets[def.preset];
+      if (!draw) throw new Error(`images.${id}: unknown preset '${def.preset}'`);
+      const c = def.preset === 'gradient' ? draw(def.from, def.to, def.width, def.height) : draw(def.size);
+      input = c.transferToImageBitmap();
+    }
+    if (!input) throw new Error(`images.${id}: needs a src or a preset`);
+    images[id] = await loadImagePixels(input, { width: def.preset ? 0 : def.width, height: def.preset ? 0 : def.height });
+  }
+  return { fonts, images };
+}

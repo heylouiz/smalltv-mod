@@ -6,3 +6,6 @@ export { renderScreen, resolveText, formatValue } from './render.js';
 export { slotValues, applySource, sourceUrl } from './values.js';
 export { TABLES, FORMATS, CLOCK_TOKENS } from './builtins.js';
 export { rasterizeFont, loadGoogleFont, loadFontFile, loadImagePixels, toImageData, Preview } from './browser.js';
+export { buildAssets } from './browser.js';
+export { PRESETS, exampleTheme, weatherIcons, gradient } from './presets.js';
+export { mount } from './ui.js';

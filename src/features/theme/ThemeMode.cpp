@@ -22,7 +22,14 @@ bool themeRecoverAfterCrash(Settings& s, uint32_t keep) {
   // fails the fallback still holds for this boot, and a repeat crash lands
   // here again rather than in a loop.
   String id = s.mode == MODE_THEME ? s.themeId : String();
-  if (id.length()) {
+  if (s.mode == MODE_THEME2) {
+    // The editor theme: back to theme mode on the built-in clock. The file
+    // stays installed, to be fixed in the editor and sent again.
+    id = "editor theme";
+    s.mode = MODE_THEME;
+    s.themeId = "";
+    saveSettings(s);
+  } else if (id.length()) {
     s.themeId = "";
     saveSettings(s);
   }

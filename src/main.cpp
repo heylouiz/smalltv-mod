@@ -22,6 +22,9 @@
 #if WITH_THEME
 #include "features/theme/ThemeMode.h"
 #endif
+#if WITH_THEME2
+#include "features/theme2/Theme2Mode.h"
+#endif
 #if WITH_NOTIFY
 #include "NotifyMode.h"
 #endif
@@ -59,6 +62,9 @@ static DisplayMode* kModes[] = {
 #if WITH_THEME
   &g_themeMode,
 #endif
+#if WITH_THEME2
+  &g_theme2Mode,
+#endif
 };
 static const size_t kModeCount = sizeof(kModes) / sizeof(kModes[0]);
 
@@ -77,6 +83,7 @@ static bool carouselHas(const Settings& s, const DisplayMode* m) {
     case MODE_HA:     return s.carouselHa;
 #endif
     case MODE_THEME:  return false; // explicitly selected, not in the existing carousel
+    case MODE_THEME2: return false;
     default:          return true;
   }
 }

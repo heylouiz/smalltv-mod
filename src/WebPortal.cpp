@@ -19,6 +19,9 @@
 #if WITH_THEME
 #include "features/theme/ThemeWeb.h"
 #endif
+#if WITH_THEME2
+#include "features/theme2/Theme2Web.h"
+#endif
 #include "SettingsTransaction.h"
 #if WITH_HA
 #include "HaScreens.h"
@@ -85,6 +88,7 @@ static void handleGetConfig() {
   feat["radar"]  = (bool)WITH_RADAR;
   feat["ha"]     = (bool)WITH_HA;
   feat["theme"]  = (bool)WITH_THEME;
+  feat["theme2"] = (bool)WITH_THEME2;
   // WireGuard is a per-chip decision rather than a per-feature one: it is
   // compiled only where the image has room for it (the ESP32-C2 build).
 #if defined(SMALLTV_WIREGUARD)
@@ -488,6 +492,9 @@ void webPortalBegin(Settings& settings) {
   // (success reboots into the new image before we ever get here).
   g_updateMsg = otaTakeBootResult();
 
+#if WITH_THEME2
+  theme2WebBegin(server, settings, requireAuth);
+#endif
 #if WITH_THEME
   themeWebBegin(server, settings, requireAuth);
 #endif

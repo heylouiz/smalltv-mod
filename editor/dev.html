@@ -1,85 +1,18 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>STV2 dev preview</title>
+<title>STV2 dev editor</title>
 <style>
-  body { background: #111; color: #ddd; font: 14px system-ui, sans-serif; margin: 16px; }
-  canvas { width: 480px; height: 480px; image-rendering: pixelated; border: 1px solid #333; max-width: 100%; }
-  pre { white-space: pre-wrap; }
+  :root { --bg:#0e1116; --card:#171c24; --mut:#8b96a5; --fg:#e6edf3; --acc:#3fb950; --red:#f85149; --bd:#262d38 }
+  body { background: var(--bg); color: var(--fg); font: 14px system-ui, sans-serif; margin: 16px; }
+  main { max-width: 680px; margin: 0 auto; }
 </style>
-<!-- Local development only: builds a two-screen weather clock with a real
-     Google font and live Open-Meteo data, compiles it and previews it. -->
-<canvas id="screen" width="240" height="240"></canvas>
-<pre id="log">loading…</pre>
+<!-- Local development: the same editor the device's Theme tab mounts, with
+     no device behind it (Send is disabled). Serve this directory over HTTP. -->
+<main id="editor"></main>
 <script src="dist/stv-editor.min.js"></script>
 <script>
-const log = (m) => { document.getElementById('log').textContent += '\n' + m; };
-// Eight weather icons drawn on a canvas, stacked as frames (wmoIcon order).
-function iconSheet() {
-  const c = new OffscreenCanvas(32, 256), g = c.getContext('2d');
-  const sun = (y) => { g.fillStyle = '#ffd166'; g.beginPath(); g.arc(16, y + 16, 9, 0, 7); g.fill(); };
-  const cloud = (y, color = '#cfd8e3') => { g.fillStyle = color; g.beginPath(); g.arc(12, y + 18, 7, 0, 7); g.arc(20, y + 15, 8, 0, 7); g.fill(); g.fillRect(6, y + 18, 20, 7); };
-  const drops = (y, color) => { g.fillStyle = color; for (const x of [9, 16, 23]) g.fillRect(x, y + 27, 2, 4); };
-  sun(0);
-  sun(32); cloud(36);
-  cloud(64);
-  cloud(96, '#8a96a3');
-  cloud(128); drops(128, '#7fb2ff');
-  cloud(160, '#8a96a3'); drops(160, '#3d8bff');
-  cloud(192); drops(192, '#ffffff');
-  cloud(224, '#5c6670'); g.fillStyle = '#ffd166'; g.fillRect(15, 251, 3, 5);
-  return c.transferToImageBitmap();
-}
-function background() {
-  const c = new OffscreenCanvas(240, 240), g = c.getContext('2d');
-  const grad = g.createLinearGradient(0, 0, 0, 240);
-  grad.addColorStop(0, '#0b1d33'); grad.addColorStop(1, '#03060c');
-  g.fillStyle = grad; g.fillRect(0, 0, 240, 240);
-  return c.transferToImageBitmap();
-}
-const source = {
-  name: 'Clima semanal', background: '#04080f',
-  fonts: { big: { family: 'Inter', weight: 700, size: 64, bpp: 4 }, small: { family: 'Inter', weight: 500, size: 16, bpp: 4 } },
-  images: { bg: {}, icons: { frames: 8 } },
-  sources: { w: { url: 'http://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto', interval: 900,
-    fields: { temp: 'current.temperature_2m', code: 'current.weather_code', max: 'daily.temperature_2m_max[0..6]', min: 'daily.temperature_2m_min[0..6]', dcode: 'daily.weather_code[0..6]' } } },
-  screens: [
-    { seconds: 8, layers: [
-      { type: 'image', image: 'bg', x: 0, y: 0 },
-      { type: 'text', font: 'small', x: 12, y: 14, w: 216, color: '#ffd166', text: '{CITY}' },
-      { type: 'text', font: 'big', x: 0, y: 62, w: 240, align: 'center', color: '#ffffff', text: '{HH}:{MM}' },
-      { type: 'text', font: 'small', x: 0, y: 140, w: 240, align: 'center', color: '#9fb4c8', text: '{WEEKDAY}, {DD} de {MONTH}' },
-      { type: 'image', image: 'icons', x: 40, y: 182, frame: { value: 'w.code', table: 'wmoIcon' } },
-      { type: 'text', font: 'small', x: 80, y: 182, w: 150, color: '#ffffff', text: '{w.temp|1}°C' },
-      { type: 'text', font: 'small', x: 80, y: 200, w: 150, color: '#9fb4c8', text: '{w.code|wmoText}' },
-    ] },
-    { seconds: 8, background: '#03060c', layers: [
-      { type: 'text', font: 'small', x: 12, y: 8, w: 216, color: '#ffd166', text: 'Próximos dias' },
-      ...[0, 1, 2, 3, 4, 5].flatMap((d) => [
-        { type: 'text', font: 'small', x: 14, y: 40 + d * 32, w: 60, color: '#ffffff', text: d ? `{WD|wd+${d}}` : 'Hoje' },
-        { type: 'image', image: 'icons', x: 92, y: 34 + d * 32, frame: { value: `w.dcode${d}`, table: 'wmoIcon' } },
-        { type: 'text', font: 'small', x: 130, y: 40 + d * 32, w: 96, align: 'right', color: '#cfd8e3', text: `{w.max${d}}° / {w.min${d}}°` },
-      ]),
-    ] },
-  ],
-};
-(async () => {
-  try {
-    await StvEditor.loadGoogleFont('Inter', 700);
-    await StvEditor.loadGoogleFont('Inter', 500);
-    const need = StvEditor.requiredGlyphs(source);
-    const fonts = {};
-    for (const [id, def] of Object.entries(source.fonts)) fonts[id] = StvEditor.rasterizeFont(def, [...need[id], 0x3f]);
-    const images = { bg: await StvEditor.loadImagePixels(background()), icons: await StvEditor.loadImagePixels(iconSheet()) };
-    const t0 = performance.now();
-    const bytes = StvEditor.compileTheme(source, { fonts, images });
-    log(`compiled ${bytes.length} bytes in ${Math.round(performance.now() - t0)} ms; glyphs big=${fonts.big.glyphs.length} small=${fonts.small.glyphs.length}`);
-    const preview = new StvEditor.Preview(document.getElementById('screen'), { location: { lat: -22.5647, lon: -47.4017 }, city: 'Limeira' });
-    preview.load(bytes);
-    window.preview = preview;
-    const screen = new URLSearchParams(location.search).get('screen');
-    if (screen) setTimeout(() => { preview.screen = Number(screen); preview.shownAt = performance.now(); }, 0);
-    setTimeout(() => log(preview.errors.length ? 'errors: ' + preview.errors.join('; ') : 'data ok: ' + JSON.stringify(preview.data.filter((v) => v !== undefined))), 2500);
-  } catch (e) { log('ERROR ' + e.stack); }
-})();
+  window.ed = StvEditor.mount(document.getElementById('editor'), {
+    api: null, location: { lat: -22.5647, lon: -47.4017 }, city: 'Limeira',
+  });
 </script>

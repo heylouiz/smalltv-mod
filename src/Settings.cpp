@@ -542,7 +542,8 @@ void settingsToJson(const Settings& s, JsonObject root, bool includeSecrets) {
 
   // Mode + shared HTTP/display
   root["themeId"] = s.themeId;
-  root["mode"]              = (s.mode == MODE_THEME)    ? "theme"
+  root["mode"]              = (s.mode == MODE_THEME2)   ? "theme2"
+                            : (s.mode == MODE_THEME)    ? "theme"
                             : (s.mode == MODE_RADAR)    ? "radar"
                             : (s.mode == MODE_USAGE)    ? "usage"
                             : (s.mode == MODE_HA)       ? "ha"
@@ -616,7 +617,8 @@ void settingsApplyJson(Settings& s, JsonObjectConst root) {
 
   if (root["mode"].is<const char*>()) {
     String m = root["mode"].as<String>();
-    s.mode = m.equalsIgnoreCase("theme")    ? MODE_THEME
+    s.mode = m.equalsIgnoreCase("theme2")   ? MODE_THEME2
+           : m.equalsIgnoreCase("theme")    ? MODE_THEME
            : m.equalsIgnoreCase("radar")    ? MODE_RADAR
            : m.equalsIgnoreCase("usage")    ? MODE_USAGE
            : m.equalsIgnoreCase("ha")       ? MODE_HA
