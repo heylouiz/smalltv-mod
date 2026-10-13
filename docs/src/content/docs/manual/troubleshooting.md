@@ -95,7 +95,11 @@ If you exported a settings backup beforehand (System tab, "Export settings"), im
 
 ## The screen shows CRASH
 
-Rare, but if it happens: the device restarted after an internal fault, and stays on this screen instead of trying to redraw whatever crashed it. It shows a fault code and its IP address, and the settings page and firmware update are still reachable at that address. Reinstalling the latest firmware version through the System tab normally clears it, and no settings are lost by doing so.
+Rare, but if it happens: the device restarted after an internal fault (an exception, a watchdog timeout, or running out of memory), and stays on this screen instead of trying to redraw whatever crashed it. It shows a fault code and its IP address, and the settings page and firmware update are still reachable at that address. Reinstalling the latest firmware version through the System tab normally clears it, and no settings are lost by doing so.
+
+## The screen shows THEME TURNED OFF
+
+The device crashed while a theme was on screen, most often because the theme needs more memory than the device has free. Instead of loading it again and crashing on every boot, the firmware switched to the built-in clock, which shows the time and the device's IP address. The theme is still installed: open **Display → Theme clocks** to remove it or install a smaller version, or select it again to retry. See [Built-in clock and crash recovery](/smalltv-mod/features/themes/#built-in-clock-and-crash-recovery).
 
 ## Updating from GitHub fails
 

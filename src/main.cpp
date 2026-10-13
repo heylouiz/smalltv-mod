@@ -111,7 +111,7 @@ static DisplayMode* activeMode(const Settings& s) {
 
 static Settings g_settings;
 static String   g_resetReason;        // why the chip last reset (diagnostics)
-static bool     g_safeMode = false;   // last reset was an exception -> don't re-enter the crash
+static bool     g_safeMode = false;   // last reset was a crash -> don't re-enter the crash path
 static char     g_epcStr[16] = "";
 static char     g_addrStr[16] = "";
 static int g_lastBr = -1;        // last effective brightness written (-1 = none yet)
@@ -170,6 +170,9 @@ void setup() {
   PlatformReset pr = platformResetInfo();
   Serial.print("[boot] reset reason: ");
   Serial.println(pr.reason);
+  // What was running when the chip went down; read once, then start clean.
+  uint32_t keep = platformKeepRead();
+  platformKeepWrite(0);
 
   if (pr.wasCrash) {
     g_safeMode = true;                   // crashed last boot -> stay out of the crash path
@@ -186,6 +189,17 @@ void setup() {
   Serial.println("[boot] settings");
   settingsBegin();
   loadSettings(g_settings);
+#if WITH_THEME
+  // A crash with a user theme active is the theme's: turn it off and boot
+  // normally into the built-in clock, rather than into safe mode (or, before
+  // this, straight back into the same theme and the same crash).
+  if (pr.wasCrash && themeRecoverAfterCrash(g_settings, keep)) {
+    Serial.println("[boot] theme crashed last boot -> built-in clock");
+    g_safeMode = false;
+  }
+#else
+  (void)keep;
+#endif
 
   Serial.println("[boot] display");
   gfxBegin(g_settings);

@@ -2,6 +2,7 @@
 #if WITH_THEME
 #include "Clock.h"
 #include "Gfx.h"
+#include "Net.h"
 #include "Platform.h"
 #include "ThemeDataClient.h"
 #include <Arduino_GFX_Library.h>
@@ -9,6 +10,25 @@
 #include <algorithm>
 
 ThemeMode g_themeMode;
+void themeCrashGuard(bool armed) {
+  uint32_t keep = platformKeepRead();
+  uint32_t next = armed ? keep | KEEP_THEME : keep & ~KEEP_THEME;
+  if (next != keep) platformKeepWrite(next);
+}
+bool themeRecoverAfterCrash(Settings& s, uint32_t keep) {
+  if (!(keep & KEEP_THEME)) return false;
+  // Only an active theme is turned off: a crash while validating an upload
+  // with another mode on screen leaves the saved selection alone. If the save
+  // fails the fallback still holds for this boot, and a repeat crash lands
+  // here again rather than in a loop.
+  String id = s.mode == MODE_THEME ? s.themeId : String();
+  if (id.length()) {
+    s.themeId = "";
+    saveSettings(s);
+  }
+  g_themeMode.setRecovered(id);
+  return true;
+}
 namespace {
 // Adapts the portable engine's Display interface to this device's actual
 // panel: glyphColumn() reads the built-in font from flash (PROGMEM), and
@@ -51,6 +71,46 @@ void ThemeMode::unload() {
   loadedId_ = "";
   attempted_ = messageDrawn_ = locationApplied_ = false;
   error_ = "";
+  themeCrashGuard(false);
+}
+// The built-in theme: the time and the device's address, drawn straight with
+// the built-in font. No package, no JSON, no heap -- it is what the device
+// falls back to after a theme crash, so it must not be able to fail the same
+// way. Repaints only what changed: the time each minute, the IP when it moves.
+void ThemeMode::renderBuiltin() {
+  Arduino_GFX* gfx = gfxDev();
+  if (!gfx) return;
+  if (!messageDrawn_) {
+    gfx->fillScreen(C_BLACK);
+    if (recovered_) {
+      gfxDrawCentered("THEME TURNED OFF", 12, 2, C_YELLOW);
+      String why = recoveredId_.length() ? recoveredId_ + " crashed" : String("theme crashed");
+      gfxDrawCentered(why.c_str(), 34, gfxFitSize(why.c_str(), 232, 2), C_GRAY);
+    }
+    builtinMinute_ = -2;
+    builtinIp_ = "";
+    messageDrawn_ = true;
+  }
+  tm t{};
+  int minute = clockNow(t) ? t.tm_hour * 60 + t.tm_min : -1;
+  if (minute != builtinMinute_) {
+    builtinMinute_ = minute;
+    char hhmm[6];
+    if (minute < 0) strcpy(hhmm, "--:--");
+    else snprintf(hhmm, sizeof(hhmm), "%02d:%02d", t.tm_hour, t.tm_min);
+    // Fixed width at a fixed spot, so an opaque redraw replaces the old time.
+    gfx->setTextSize(7);
+    gfx->setTextColor(C_WHITE, C_BLACK);
+    gfx->setCursor((TFT_WIDTH - gfxTextW(hhmm, 7)) / 2, 84);
+    gfx->print(hhmm);
+  }
+  String ip = netIP();
+  if (ip != builtinIp_) {
+    builtinIp_ = ip;
+    gfx->fillRect(0, 170, TFT_WIDTH, 24, C_BLACK);
+    const char* shown = ip.length() ? ip.c_str() : "-";
+    gfxDrawCentered(shown, 170, gfxFitSize(shown, 232, 3), C_GREEN);
+  }
 }
 // Mirrors the device location into the loaded theme: the city reaches text
 // layers as the {CITY} value, and a moved location reschedules every source
@@ -135,9 +195,16 @@ void ThemeMode::invalidate(const Settings& s) {
 // block runs every call once a package is open.
 void ThemeMode::service(const Settings& s) {
   if (loadedId_ != s.themeId) unload();
+  if (s.themeId.isEmpty()) {
+    renderBuiltin();
+    return;
+  }
   if (!attempted_) {
     attempted_ = true;
     loadedId_ = s.themeId;
+    // Armed from here until unload(): the load, every render and fetch, and
+    // the heap the theme keeps while it is on screen.
+    themeCrashGuard(true);
     std::string error;
     smalltv::Theme theme;
     if (!smalltv::validId(s.themeId.c_str())) error = "Select an installed theme";
@@ -157,6 +224,7 @@ void ThemeMode::service(const Settings& s) {
       error_ = error.c_str();
       package_.reset();
       file_.reset();
+      themeCrashGuard(false);
     } else {
       dataNextMs_.assign(theme.data.size(), 0);
       dataScheduled_.assign(theme.data.size(), false);
@@ -191,6 +259,7 @@ void ThemeMode::service(const Settings& s) {
     package_.reset();
     file_.reset();
     messageDrawn_ = false;
+    themeCrashGuard(false);
   }
 }
 #endif
