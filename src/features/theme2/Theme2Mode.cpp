@@ -10,7 +10,7 @@
 Theme2Mode g_theme2Mode;
 
 namespace {
-constexpr int BandRows = 8;
+constexpr int BandRows = 4;
 constexpr uint32_t FetchTimeoutMs = 6000;
 constexpr uint16_t MaxOps = 96;
 }

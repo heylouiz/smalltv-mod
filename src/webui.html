@@ -60,6 +60,7 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
  <button data-t="usage">Clawdmeter</button>
  <button data-t="radar">Radar</button>
  <button data-t="ha">Home Assistant</button>
+ <button data-t="theme2">Theme</button>
  <button data-t="update">System</button>
 </nav>
 <main>
@@ -120,6 +121,7 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
     <option value="radar">Radar</option>
     <option value="ha">Home Assistant</option>
     <option value="theme">Theme clock</option>
+    <option value="theme2">Theme (editor)</option>
     <option value="carousel">Carousel (rotate modes)</option>
    </select>
    <div id="carouselRow">
@@ -335,6 +337,23 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
  </section>
 
  <!-- UPDATE -->
+ <section id="theme2" class="tab">
+  <div class="card"><h2>Theme</h2>
+   <div class="kv"><span>Installed</span><b id="t2Name">–</b></div>
+   <div class="kv"><span>Size</span><b id="t2Size">–</b></div>
+   <div class="kv"><span>Free storage</span><b id="t2Free">–</b></div>
+   <div style="margin-top:12px"><button class="btn" id="t2Use" onclick="t2Select()">Show this theme</button>
+    <button class="btn sec" id="t2Back" onclick="t2Rollback()">Restore previous</button></div>
+   <small class="hint" id="t2Status"></small>
+  </div>
+  <div class="card"><h2>Editor</h2><div id="stvEditor"><small class="hint">Loading the editor…</small></div>
+   <small class="hint">The editor runs in this browser: it loads from cdn.jsdelivr.net, builds the theme here, and sends the finished file to the device. Weather and other data in the preview are fetched by this browser too.</small>
+  </div>
+  <div class="card"><h2>Install a compiled theme</h2>
+   <input id="t2File" type="file" accept=".stv"> <button class="btn sec" onclick="t2Upload()">Install .stv</button>
+   <small class="hint">For when the editor cannot load (no internet in this browser): a .stv built elsewhere.</small>
+  </div>
+ </section>
  <section id="update" class="tab">
   <div class="card"><h2>Update from GitHub</h2>
    <div class="muted">Installed: <b id="fwVer">-</b></div>
@@ -394,6 +413,7 @@ document.querySelectorAll('nav button').forEach(function(b){b.onclick=function()
  document.querySelectorAll('nav button').forEach(function(x){x.classList.remove('active')});
  document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});
  b.classList.add('active');$(b.dataset.t).classList.add('active');
+ if(b.dataset.t==='theme2'){t2Info();t2LoadEditor()}
 }});
 
 // field groups by their location in the nested config
@@ -432,7 +452,7 @@ var TZMAP={
 function fillTz(){var s=$('tz');if(!s)return;var keys=Object.keys(TZMAP).filter(function(k){return k!==''});
  keys.sort();s.innerHTML='<option value="">UTC</option>'+keys.map(function(k){return '<option value="'+k+'">'+k+'</option>'}).join('');}
 
-var MODEOPT={ticker:'stocks',usage:'usage',radar:'radar',ha:'ha',theme:'theme'};
+var MODEOPT={ticker:'stocks',usage:'usage',radar:'radar',ha:'ha',theme:'theme',theme2:'theme2'};
 var CAROPT={ticker:'carouselTicker',usage:'carouselUsage',radar:'carouselRadar',ha:'carouselHa'};
 function hideFeat(name){
  var b=document.querySelector('nav button[data-t="'+name+'"]'); if(b)b.remove();
@@ -458,6 +478,7 @@ function resetColors(){setGain('rGain','rgVal',100);setGain('gGain','ggVal',100)
 function loadConfig(){return j('/api/config').then(function(c){C=c;
  var f=c.features||{}; ['ticker','usage','radar','ha'].forEach(function(k){if(f[k]===false)hideFeat(k)});
  // WireGuard is only built for the chips with room for it; drop the card otherwise
+ if(f.theme2!==true)hideFeat('theme2');
  if(f.theme!==true){hideFeat('theme');var tc=$('themeCard');if(tc)tc.remove();var lcd=$('locCard');if(lcd)lcd.remove()}else{loadThemes()}
  if(f.wireguard===false){var wc=$('wgCard'); if(wc)wc.remove()}
  var w=c.wg||{};
@@ -723,6 +744,32 @@ function locSearch(){var q=gv('locQuery').trim();if(!q){toast('Type a city name'
 function locPick(i){var p=LOC_HITS[i];if(!p)return;
  sv('locCity',asciiFold(p.name));sv('locLat',p.latitude.toFixed(4));sv('locLon',p.longitude.toFixed(4));
  $('locResults').innerHTML='';toast('Save settings to apply')}
+
+// theme v2: the editor library is pinned to one release of the fork and
+// checked with SRI, since it can write to this device (tools/pin_editor.py).
+// localStorage 'stvEditorUrl' overrides it for development.
+var STV_EDITOR_URL='https://cdn.jsdelivr.net/gh/heylouiz/smalltv-mod@1a876480af3b810887fc37b625f028d5b5f531e4/editor/dist/stv-editor.min.js';
+var STV_EDITOR_SRI='sha384-fljd06Ufd2c/ZE9fPLnRG/8h6P52g5GME9mKLMv8dUyvqfPTq02wnGyCz6qm3Z/1';
+var t2Loading=false;
+function t2Kb(n){return (n/1024).toFixed(1)+' KB'}
+function t2Info(){return j('/api/theme2/info').then(function(d){
+ $('t2Name').textContent=d.installed?(d.name||'Theme')+(d.screens>1?' · '+d.screens+' screens':''):'none yet';
+ $('t2Size').textContent=d.installed?t2Kb(d.bytes):'–';
+ $('t2Free').textContent=t2Kb(d.freeBytes);
+ $('t2Use').disabled=!d.installed||d.active;$('t2Back').disabled=!d.previous;
+ $('t2Status').textContent=(d.recovered?'A theme crashed the device and was turned off; the built-in clock is showing. ':'')+(d.active?'Showing on the device.':(d.installed?'Installed, not showing.':''))+(d.error?' · '+d.error:'');
+}).catch(function(e){$('t2Status').textContent=e.message})}
+function t2LoadEditor(){if(window.StvEditor||t2Loading)return;t2Loading=true;
+ var u=null;try{u=localStorage.getItem('stvEditorUrl')}catch(e){}
+ var s=document.createElement('script');s.src=u||STV_EDITOR_URL;
+ if(!u){s.integrity=STV_EDITOR_SRI;s.crossOrigin='anonymous'}
+ s.onload=function(){var l=C.location||{};StvEditor.mount($('stvEditor'),{location:(l.lat||l.lon)?{lat:l.lat,lon:l.lon}:null,city:l.city||'',onInstalled:function(){C.mode='theme2';sv('mode','theme2');t2Info()}})};
+ s.onerror=function(){t2Loading=false;$('stvEditor').innerHTML='<small class="hint">The editor could not be loaded from cdn.jsdelivr.net. Check this browser\'s internet connection, or install a compiled .stv below.</small>'};
+ document.head.appendChild(s)}
+function t2Select(){j('/api/theme2/select',{method:'POST'}).then(function(){C.mode='theme2';sv('mode','theme2');toast('Theme selected');t2Info()}).catch(function(e){toast(e.message)})}
+function t2Rollback(){if(!confirm('Go back to the previous theme?'))return;j('/api/theme2/rollback',{method:'POST'}).then(function(){toast('Previous theme restored');t2Info()}).catch(function(e){toast(e.message)})}
+function t2Upload(){var f=$('t2File').files[0];if(!f){toast('Choose a .stv file');return}
+ var d=new FormData();d.append('theme',f);fetch('/api/theme2',{method:'POST',body:d}).then(function(r){return r.json().then(function(x){if(!r.ok)throw new Error(x.error||'Install failed');return x})}).then(function(){toast('Theme installed');C.mode='theme2';sv('mode','theme2');t2Info()}).catch(function(e){toast(e.message)})}
 
 // wifi scan
 function scan(){$('scanList').innerHTML='<div class="muted">Scanning...</div>';

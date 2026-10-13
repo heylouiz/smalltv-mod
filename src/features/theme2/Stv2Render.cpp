@@ -199,7 +199,7 @@ uint16_t imageFrame(Theme& theme, const Values& values, const Op& op, uint32_t t
 }
 
 bool findGlyph(Theme& theme, Scratch& s, uint16_t fontIndex, const Font& font, uint32_t cp, Glyph& out) {
-  unsigned slot = (cp ^ (fontIndex * 31u)) & 31u;
+  unsigned slot = (cp ^ (fontIndex * 31u)) & 15u;
   if ((s.glyphValid[slot >> 3] >> (slot & 7)) & 1) {
     const Scratch::CachedGlyph& c = s.glyphs[slot];
     if (c.font == fontIndex && c.codepoint == cp && cp <= 0xFFFF) { out = c.glyph; return true; }

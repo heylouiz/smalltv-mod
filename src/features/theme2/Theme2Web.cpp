@@ -189,7 +189,7 @@ void info() {
   server->send(200, "application/json", json);
 }
 
-void select() {
+void selectTheme2() {
   if (!auth()) return;
   if (!LittleFS.exists(theme2::Active)) {
     reply(404, "error", "No theme installed");
@@ -243,7 +243,7 @@ void theme2WebBegin(WebServerClass& web, Settings& s, bool (*requireAuth)()) {
   web.on("/api/theme2/source", HTTP_POST, finishSource, [] { receive(theme2::SourceJson, MaxSource); });
   web.on("/api/theme2/source", HTTP_GET, getSource);
   web.on("/api/theme2/info", HTTP_GET, info);
-  web.on("/api/theme2/select", HTTP_POST, select);
+  web.on("/api/theme2/select", HTTP_POST, selectTheme2);
   web.on("/api/theme2/rollback", HTTP_POST, rollback);
   web.on("/api/theme2/snapshot", HTTP_GET, snapshot);
 }

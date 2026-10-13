@@ -5,6 +5,14 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#if defined(ARDUINO)
+#include <pgmspace.h>
+// Validation messages live in flash: on the ESP8266 a plain string literal
+// costs RAM, and there are dozens of them.
+#define STV2_MSG(s) PSTR(s)
+#else
+#define STV2_MSG(s) (s)
+#endif
 
 namespace stv2 {
 namespace {
@@ -16,7 +24,14 @@ inline int16_t i16(const uint8_t* p) { return int16_t(u16(p)); }
 inline uint32_t u32(const uint8_t* p) { return uint32_t(p[0]) | (uint32_t(p[1]) << 8) | (uint32_t(p[2]) << 16) | (uint32_t(p[3]) << 24); }
 
 bool fail(char* error, size_t size, const char* msg) {
-  if (error && size) snprintf(error, size, "%s", msg);
+  if (error && size) {
+#if defined(ARDUINO)
+    strncpy_P(error, msg, size - 1);
+    error[size - 1] = 0;
+#else
+    snprintf(error, size, "%s", msg);
+#endif
+  }
   return false;
 }
 
@@ -107,40 +122,40 @@ bool Theme::open(Source& source, char* error, size_t es) {
   blobSize_ = 0;
   uint8_t h[32];
   uint32_t size = source.size();
-  if (size < 32 || !source.read(0, h, 32)) return fail(error, es, "file too short");
-  if (memcmp(h, "STV2", 4) != 0) return fail(error, es, "not an STV2 file");
-  if (u16(h + 4) != FormatVersion) return fail(error, es, "unsupported format version");
+  if (size < 32 || !source.read(0, h, 32)) return fail(error, es, STV2_MSG("file too short"));
+  if (memcmp(h, "STV2", 4) != 0) return fail(error, es, STV2_MSG("not an STV2 file"));
+  if (u16(h + 4) != FormatVersion) return fail(error, es, STV2_MSG("unsupported format version"));
   uint16_t sections = u16(h + 6);
-  if (u32(h + 8) != size) return fail(error, es, "file size does not match header");
-  if (size > MaxFile) return fail(error, es, "file too large");
-  if (u16(h + 16) != Width || u16(h + 18) != Height) return fail(error, es, "unsupported canvas size");
+  if (u32(h + 8) != size) return fail(error, es, STV2_MSG("file size does not match header"));
+  if (size > MaxFile) return fail(error, es, STV2_MSG("file too large"));
+  if (u16(h + 16) != Width || u16(h + 18) != Height) return fail(error, es, STV2_MSG("unsupported canvas size"));
   // CRC over everything after the CRC field, in small chunks.
   uint32_t crc = 0;
   uint8_t chunk[128];
   for (uint32_t at = 16; at < size;) {
     size_t n = size - at < sizeof(chunk) ? size - at : sizeof(chunk);
-    if (!source.read(at, chunk, n)) return fail(error, es, "read error");
+    if (!source.read(at, chunk, n)) return fail(error, es, STV2_MSG("read error"));
     crc = crc32Update(crc, chunk, n);
     at += n;
   }
-  if (crc != u32(h + 12)) return fail(error, es, "checksum mismatch");
+  if (crc != u32(h + 12)) return fail(error, es, STV2_MSG("checksum mismatch"));
   uint32_t tableEnd = 32 + uint32_t(sections) * 12;
-  if (tableEnd > size) return fail(error, es, "section table out of range");
+  if (tableEnd > size) return fail(error, es, STV2_MSG("section table out of range"));
   bool seen[SecCount] = {};
   for (uint16_t i = 0; i < sections; i++) {
     uint8_t e[12];
-    if (!source.read(32 + i * 12, e, 12)) return fail(error, es, "read error");
+    if (!source.read(32 + i * 12, e, 12)) return fail(error, es, STV2_MSG("read error"));
     uint16_t type = u16(e), rs = u16(e + 2);
     uint32_t off = u32(e + 4), len = u32(e + 8);
-    if (type == 0 || type >= SecCount) return fail(error, es, "unknown section");
-    if (seen[type]) return fail(error, es, "duplicate section");
+    if (type == 0 || type >= SecCount) return fail(error, es, STV2_MSG("unknown section"));
+    if (seen[type]) return fail(error, es, STV2_MSG("duplicate section"));
     seen[type] = true;
-    if (rs != RecordSize[type]) return fail(error, es, "bad record size");
-    if (off % 4 || off < tableEnd || off + len > size || off + len < off) return fail(error, es, "section out of range");
+    if (rs != RecordSize[type]) return fail(error, es, STV2_MSG("bad record size"));
+    if (off % 4 || off < tableEnd || off + len > size || off + len < off) return fail(error, es, STV2_MSG("section out of range"));
     offset_[type] = off;
     if (type == SecBlob) { blobSize_ = len; continue; }
-    if (len % rs) return fail(error, es, "partial record");
-    if (len / rs > MaxRecords[type]) return fail(error, es, "too many records");
+    if (len % rs) return fail(error, es, STV2_MSG("partial record"));
+    if (len / rs > MaxRecords[type]) return fail(error, es, STV2_MSG("too many records"));
     count_[type] = uint16_t(len / rs);
   }
   name_ = u16(h + 20);
@@ -150,26 +165,26 @@ bool Theme::open(Source& source, char* error, size_t es) {
 }
 
 bool Theme::validateImage(const Image& im, char* error, size_t es) {
-  if (!im.w || !im.h || im.w > Width || im.h > Height) return fail(error, es, "image: bad size");
-  if (!im.frames || im.frames > 256) return fail(error, es, "image: bad frame count");
-  if (im.offset + im.size > blobSize_ || im.offset + im.size < im.offset) return fail(error, es, "image: data out of range");
+  if (!im.w || !im.h || im.w > Width || im.h > Height) return fail(error, es, STV2_MSG("image: bad size"));
+  if (!im.frames || im.frames > 256) return fail(error, es, STV2_MSG("image: bad frame count"));
+  if (im.offset + im.size > blobSize_ || im.offset + im.size < im.offset) return fail(error, es, STV2_MSG("image: data out of range"));
   uint32_t rows = uint32_t(im.h) * im.frames, px = uint32_t(im.w) * rows;
   if (im.encoding == 0) {
-    if (im.size != px * 2 + ((im.flags & 1) ? px : 0)) return fail(error, es, "image: size does not match pixels");
+    if (im.size != px * 2 + ((im.flags & 1) ? px : 0)) return fail(error, es, STV2_MSG("image: size does not match pixels"));
     return true;
   }
-  if (im.encoding != 1) return fail(error, es, "image: unknown encoding");
+  if (im.encoding != 1) return fail(error, es, STV2_MSG("image: unknown encoding"));
   uint8_t b[4];
-  if (im.size < 4 || !blob(im.offset, b, 4)) return fail(error, es, "image: truncated");
+  if (im.size < 4 || !blob(im.offset, b, 4)) return fail(error, es, STV2_MSG("image: truncated"));
   uint16_t n = u16(b);
-  if (!n || n > 256) return fail(error, es, "image: bad palette");
+  if (!n || n > 256) return fail(error, es, STV2_MSG("image: bad palette"));
   uint32_t table = 4 + uint32_t(n) * 3;
-  if (table + rows * 4 > im.size) return fail(error, es, "image: truncated");
+  if (table + rows * 4 > im.size) return fail(error, es, STV2_MSG("image: truncated"));
   // Decode every row once: each must produce exactly w indices < n without
   // leaving the image. Bytes come through a small window to keep RAM flat.
   uint8_t win[64];
   for (uint32_t r = 0; r < rows; r++) {
-    if (!blob(im.offset + table + r * 4, b, 4)) return fail(error, es, "read error");
+    if (!blob(im.offset + table + r * 4, b, 4)) return fail(error, es, STV2_MSG("read error"));
     uint32_t at = u32(b), out = 0, winStart = 0, winLen = 0;
     auto byteAt = [&](uint32_t pos, uint8_t& v) -> bool {
       if (pos >= im.size) return false;
@@ -183,13 +198,13 @@ bool Theme::validateImage(const Image& im, char* error, size_t es) {
     };
     while (out < im.w) {
       uint8_t c, v;
-      if (!byteAt(at++, c)) return fail(error, es, "image: row out of range");
+      if (!byteAt(at++, c)) return fail(error, es, STV2_MSG("image: row out of range"));
       uint32_t run = c < 128 ? c + 1u : c - 126u;
-      if (out + run > im.w) return fail(error, es, "image: row overruns width");
+      if (out + run > im.w) return fail(error, es, STV2_MSG("image: row overruns width"));
       uint32_t literal = c < 128 ? run : 1;
       for (uint32_t k = 0; k < literal; k++) {
-        if (!byteAt(at++, v)) return fail(error, es, "image: row out of range");
-        if (v >= n) return fail(error, es, "image: index outside palette");
+        if (!byteAt(at++, v)) return fail(error, es, STV2_MSG("image: row out of range"));
+        if (v >= n) return fail(error, es, STV2_MSG("image: index outside palette"));
       }
       out += run;
     }
@@ -198,53 +213,53 @@ bool Theme::validateImage(const Image& im, char* error, size_t es) {
 }
 
 bool Theme::validate(char* error, size_t es) {
-  if (name_ != None && name_ >= count_[SecStrings]) return fail(error, es, "name: bad reference");
+  if (name_ != None && name_ >= count_[SecStrings]) return fail(error, es, STV2_MSG("name: bad reference"));
   for (uint16_t i = 0; i < count_[SecStrings]; i++) {
     StringRec s; stringRec(i, s);
-    if (s.offset + s.length > blobSize_) return fail(error, es, "string: data out of range");
+    if (s.offset + s.length > blobSize_) return fail(error, es, STV2_MSG("string: data out of range"));
   }
-  if (!count_[SecScreens]) return fail(error, es, "theme has no screens");
+  if (!count_[SecScreens]) return fail(error, es, STV2_MSG("theme has no screens"));
   for (uint16_t i = 0; i < count_[SecScreens]; i++) {
     Screen s; screen(i, s);
-    if (uint32_t(s.firstOp) + s.opCount > count_[SecOps]) return fail(error, es, "screen: range out of bounds");
-    if (s.opCount > 96) return fail(error, es, "screen: too many ops");
+    if (uint32_t(s.firstOp) + s.opCount > count_[SecOps]) return fail(error, es, STV2_MSG("screen: range out of bounds"));
+    if (s.opCount > 96) return fail(error, es, STV2_MSG("screen: too many ops"));
   }
   for (uint16_t i = 0; i < count_[SecTemplates]; i++) {
     Template t; templ(i, t);
-    if (uint32_t(t.firstPart) + t.partCount > count_[SecParts]) return fail(error, es, "template: range out of bounds");
+    if (uint32_t(t.firstPart) + t.partCount > count_[SecParts]) return fail(error, es, STV2_MSG("template: range out of bounds"));
   }
   for (uint16_t i = 0; i < count_[SecParts]; i++) {
     Part p; part(i, p);
-    if (p.kind == 0) { if (p.a >= count_[SecStrings]) return fail(error, es, "literal: bad reference"); }
+    if (p.kind == 0) { if (p.a >= count_[SecStrings]) return fail(error, es, STV2_MSG("literal: bad reference")); }
     else if (p.kind == 1) {
-      if (p.a >= count_[SecSlots]) return fail(error, es, "value: bad reference");
-      if (p.b != None && p.b >= count_[SecFormats]) return fail(error, es, "format: bad reference");
-    } else return fail(error, es, "part: bad kind");
+      if (p.a >= count_[SecSlots]) return fail(error, es, STV2_MSG("value: bad reference"));
+      if (p.b != None && p.b >= count_[SecFormats]) return fail(error, es, STV2_MSG("format: bad reference"));
+    } else return fail(error, es, STV2_MSG("part: bad kind"));
   }
   for (uint16_t i = 0; i < count_[SecSlots]; i++) {
     Slot s; slot(i, s);
-    if (s.kind > SlotData || s.type > TypeString) return fail(error, es, "slot: bad kind");
-    if (s.kind == SlotClock && s.arg > ClockAmPm) return fail(error, es, "slot: bad clock field");
-    if (s.type == TypeString && (!s.poolSize || uint32_t(s.poolOffset) + s.poolSize > PoolSize)) return fail(error, es, "slot: string pool out of range");
+    if (s.kind > SlotData || s.type > TypeString) return fail(error, es, STV2_MSG("slot: bad kind"));
+    if (s.kind == SlotClock && s.arg > ClockAmPm) return fail(error, es, STV2_MSG("slot: bad clock field"));
+    if (s.type == TypeString && (!s.poolSize || uint32_t(s.poolOffset) + s.poolSize > PoolSize)) return fail(error, es, STV2_MSG("slot: string pool out of range"));
   }
   for (uint16_t i = 0; i < count_[SecFormats]; i++) {
     Format f; format(i, f);
-    if (f.table != None && f.table >= count_[SecTables]) return fail(error, es, "format table: bad reference");
+    if (f.table != None && f.table >= count_[SecTables]) return fail(error, es, STV2_MSG("format table: bad reference"));
   }
   for (uint16_t i = 0; i < count_[SecTables]; i++) {
     Table t; table(i, t);
-    if (uint32_t(t.firstEntry) + t.count > count_[SecEntries]) return fail(error, es, "table: range out of bounds");
+    if (uint32_t(t.firstEntry) + t.count > count_[SecEntries]) return fail(error, es, STV2_MSG("table: range out of bounds"));
   }
   for (uint16_t i = 0; i < count_[SecSources]; i++) {
     SourceRec s; sourceRec(i, s);
-    if (s.url >= count_[SecStrings]) return fail(error, es, "source url: bad reference");
-    if (uint32_t(s.firstField) + s.fieldCount > count_[SecFields]) return fail(error, es, "source: range out of bounds");
-    if (!s.seconds) return fail(error, es, "source: interval must be positive");
+    if (s.url >= count_[SecStrings]) return fail(error, es, STV2_MSG("source url: bad reference"));
+    if (uint32_t(s.firstField) + s.fieldCount > count_[SecFields]) return fail(error, es, STV2_MSG("source: range out of bounds"));
+    if (!s.seconds) return fail(error, es, STV2_MSG("source: interval must be positive"));
   }
   for (uint16_t i = 0; i < count_[SecFields]; i++) {
     Field f; field(i, f);
-    if (f.slot >= count_[SecSlots]) return fail(error, es, "field slot: bad reference");
-    if (!f.depth || f.depth > MaxPath) return fail(error, es, "field: bad path depth");
+    if (f.slot >= count_[SecSlots]) return fail(error, es, STV2_MSG("field slot: bad reference"));
+    if (!f.depth || f.depth > MaxPath) return fail(error, es, STV2_MSG("field: bad path depth"));
   }
   for (uint16_t i = 0; i < count_[SecImages]; i++) {
     Image im; image(i, im);
@@ -253,40 +268,40 @@ bool Theme::validate(char* error, size_t es) {
   uint32_t glyphs = 0;
   for (uint16_t i = 0; i < count_[SecFonts]; i++) {
     Font f; font(i, f);
-    if (uint32_t(f.firstGlyph) + f.glyphCount > count_[SecGlyphs]) return fail(error, es, "font: range out of bounds");
-    if (!f.glyphCount || (f.bpp != 1 && f.bpp != 4)) return fail(error, es, "font: bad glyphs or depth");
-    if (f.fallback >= f.glyphCount) return fail(error, es, "font: bad fallback");
+    if (uint32_t(f.firstGlyph) + f.glyphCount > count_[SecGlyphs]) return fail(error, es, STV2_MSG("font: range out of bounds"));
+    if (!f.glyphCount || (f.bpp != 1 && f.bpp != 4)) return fail(error, es, STV2_MSG("font: bad glyphs or depth"));
+    if (f.fallback >= f.glyphCount) return fail(error, es, STV2_MSG("font: bad fallback"));
     long last = -1;
     for (uint16_t g = f.firstGlyph; g < f.firstGlyph + f.glyphCount; g++) {
       Glyph gl; glyph(g, gl);
-      if (long(gl.codepoint) <= last) return fail(error, es, "font: glyphs not sorted");
+      if (long(gl.codepoint) <= last) return fail(error, es, STV2_MSG("font: glyphs not sorted"));
       last = gl.codepoint;
-      if (gl.w > 120 || gl.h > 120) return fail(error, es, "glyph too large");
+      if (gl.w > 120 || gl.h > 120) return fail(error, es, STV2_MSG("glyph too large"));
       uint32_t bytes = uint32_t(gl.h) * ((uint32_t(gl.w) * f.bpp + 7) / 8);
-      if (f.offset + gl.offset + bytes > blobSize_) return fail(error, es, "glyph: data out of range");
+      if (f.offset + gl.offset + bytes > blobSize_) return fail(error, es, STV2_MSG("glyph: data out of range"));
     }
     glyphs += f.glyphCount;
   }
-  if (glyphs > 2048) return fail(error, es, "too many glyphs");
+  if (glyphs > 2048) return fail(error, es, STV2_MSG("too many glyphs"));
   for (uint16_t i = 0; i < count_[SecOps]; i++) {
     Op o; op(i, o);
     switch (o.type) {
       case OpRect: case OpCircle: break;
       case OpImage: {
-        if (o.a >= count_[SecImages]) return fail(error, es, "image op: bad reference");
+        if (o.a >= count_[SecImages]) return fail(error, es, STV2_MSG("image op: bad reference"));
         Image im; image(o.a, im);
-        if (o.w != im.w || o.h != im.h) return fail(error, es, "image op: size does not match image");
+        if (o.w != im.w || o.h != im.h) return fail(error, es, STV2_MSG("image op: size does not match image"));
         if (o.flags & FrameValue) {
-          if (o.b >= count_[SecTables]) return fail(error, es, "image frame table: bad reference");
-          if (o.c >= count_[SecSlots]) return fail(error, es, "image frame slot: bad reference");
-        } else if (!(o.flags & Animate) && o.c >= im.frames) return fail(error, es, "image op: bad frame");
+          if (o.b >= count_[SecTables]) return fail(error, es, STV2_MSG("image frame table: bad reference"));
+          if (o.c >= count_[SecSlots]) return fail(error, es, STV2_MSG("image frame slot: bad reference"));
+        } else if (!(o.flags & Animate) && o.c >= im.frames) return fail(error, es, STV2_MSG("image op: bad frame"));
         break;
       }
       case OpText:
-        if (o.a >= count_[SecFonts]) return fail(error, es, "text font: bad reference");
-        if (o.b >= count_[SecTemplates]) return fail(error, es, "text template: bad reference");
+        if (o.a >= count_[SecFonts]) return fail(error, es, STV2_MSG("text font: bad reference"));
+        if (o.b >= count_[SecTemplates]) return fail(error, es, STV2_MSG("text template: bad reference"));
         break;
-      default: return fail(error, es, "bad op type");
+      default: return fail(error, es, STV2_MSG("bad op type"));
     }
   }
   return true;

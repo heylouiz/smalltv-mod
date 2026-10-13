@@ -2,8 +2,8 @@
 //
 // One theme is installed at a time: /theme2/active.stv, with the one it
 // replaced kept as /theme2/previous.stv. The file stays in flash; while the
-// mode runs it holds a single fixed workspace (values, render scratch, an
-// 8-row band, the JSON reader) -- about 10 KB, whatever the theme's size.
+// mode runs it holds a single fixed workspace (values, render scratch, a
+// 4-row band, the JSON reader) -- about 8 KB, whatever the theme's size.
 #pragma once
 #include "config.h"
 #if WITH_THEME2

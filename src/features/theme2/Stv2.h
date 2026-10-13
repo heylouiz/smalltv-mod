@@ -132,8 +132,8 @@ struct Scratch {
   uint8_t paletteAlpha[256];
   uint16_t paletteImage = None;         // image whose palette is cached
   struct CachedGlyph { uint16_t font; uint16_t codepoint; Glyph glyph; };
-  CachedGlyph glyphs[32];
-  uint8_t glyphValid[32 / 8];
+  CachedGlyph glyphs[16];
+  uint8_t glyphValid[16 / 8];
   char text[MaxText + 64];
   void reset() { paletteImage = None; for (auto& b : glyphValid) b = 0; }
 };
