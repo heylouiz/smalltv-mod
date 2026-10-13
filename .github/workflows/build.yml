@@ -22,6 +22,10 @@ jobs:
         with:
           python-version: '3.12'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       # restore-keys matters more than the key does. A cold ~/.platformio is not
       # merely slower, it is the one state in which the build breaks (see the
       # SCons note below), and the key is a hash of platformio.ini, so every
@@ -102,6 +106,16 @@ jobs:
           cmp examples/themes/live-status.stheme /tmp/live-status.stheme
           THEME_LIBDEPS=.pio/libdeps/smalltv_theme sh tests/theme/run.sh
           node tests/theme/test_webui.js
+
+      # Theme v2 editor library: unit tests, and the committed bundle must
+      # match the sources (jsDelivr serves editor/dist straight from the tag).
+      - name: Test theme editor library
+        working-directory: editor
+        run: |
+          npm ci
+          npm test
+          npm run build
+          git diff --exit-code dist/
 
       # Host-native, not board-specific: only needs ArduinoJson, which the
       # firmware build above already fetched into .pio/libdeps.

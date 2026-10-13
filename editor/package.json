@@ -1,0 +1,15 @@
+{
+  "name": "smalltv-theme-editor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser editor and compiler for SmallTV theme v2 (STV2) files",
+  "type": "module",
+  "license": "WTFPL",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "build": "esbuild src/index.js --bundle --minify --format=iife --global-name=StvEditor --target=es2020 --outfile=dist/stv-editor.min.js"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.0"
+  }
+}
