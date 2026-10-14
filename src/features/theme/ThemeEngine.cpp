@@ -168,28 +168,9 @@ uint16_t resolveColorBinding(const ColorBinding& binding, double value) {
   }
   return result;
 }
-// Clock/date tokens, plus the device's configured {CITY}, recognized inside
-// {...} regardless of what data sources a theme declares; anything else must
-// resolve to a declared "<source>.<field>".
-static const char* const tokens[] = {"HH", "hh", "MM", "SS", "DD", "MON", "MONTH", "WD", "WEEKDAY", "YYYY", "CITY"};
-// The only placeholders a data URL may carry, filled from the device location
-// at fetch time by expandDataUrl().
-static const char* const urlTokens[] = {"lat", "lon"};
-// A data `url`: every {...} span must be a urlTokens entry, and a bare '}'
-// outside one is rejected, the same rule validText applies to text templates.
-static bool validUrlPlaceholders(const std::string& url) {
-  for (size_t i = 0; i < url.size(); ++i) {
-    if (url[i] == '}') return false;
-    if (url[i] != '{') continue;
-    size_t end = url.find('}', i);
-    if (end == std::string::npos) return false;
-    bool found = false;
-    for (auto token : urlTokens) if (url.compare(i + 1, end - i - 1, token) == 0) found = true;
-    if (!found) return false;
-    i = end;
-  }
-  return true;
-}
+// Clock/date tokens recognized inside {...} regardless of what data sources a
+// theme declares; anything else must resolve to a declared "<source>.<field>".
+static const char* const tokens[] = {"HH", "hh", "MM", "SS", "DD", "MON", "MONTH", "WD", "WEEKDAY", "YYYY"};
 // True if `token` is a declared "<source-id>.<field-id>" reference: both
 // halves must be valid IDs, and the source and field must actually appear in
 // this theme's `data` block. Shared between text-template validation
@@ -833,7 +814,6 @@ bool parseTheme(const std::string& json, Theme& out, std::string& error) {
       if (hostStart == 8 && !data.insecureTls) return sf.fail("insecureTls", "set true to acknowledge that HTTPS certificate validation is unavailable");
       size_t hostEnd = data.url.find('/', hostStart);
       if (hostStart == data.url.size() || (hostEnd == hostStart) || (data.url[hostStart] == '?' || data.url[hostStart] == '#')) return sf.fail("url", "URL must include a host");
-      if (!validUrlPlaceholders(data.url)) return sf.fail("url", "only {lat} and {lon} placeholders are supported");
       data.interval = static_cast<uint32_t>(interval);
       auto fields = source["fields"].as<JsonArrayConst>();
       if (fields.isNull() || fields.size() == 0 || fields.size() > MaxDataFields) return sf.fail("fields", "expected 1 to 8 fields");
@@ -940,23 +920,6 @@ bool parseTheme(const std::string& json, Theme& out, std::string& error) {
   }
   out = std::move(t);
   error.clear();
-  return true;
-}
-bool expandDataUrl(const std::string& url, const Location& location, std::string& out) {
-  out.clear();
-  for (size_t i = 0; i < url.size();) {
-    bool lat = url.compare(i, 5, "{lat}") == 0, lon = url.compare(i, 5, "{lon}") == 0;
-    if (!lat && !lon) {
-      out += url[i++];
-      continue;
-    }
-    if (!location.set) return false;
-    // Four decimals is ~11 m, finer than any weather grid.
-    char b[16];
-    snprintf(b, sizeof(b), "%.4f", lat ? location.lat : location.lon);
-    out += b;
-    i += 5;
-  }
   return true;
 }
 std::string expandText(const std::string& value, const tm* t) {

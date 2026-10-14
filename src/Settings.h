@@ -86,21 +86,6 @@ struct ClockSettings {
   void fromJson(JsonObjectConst o);
 };
 
-// ---- Location slice (device-wide) ------------------------------------------
-// Where the device is, for theme data URLs ({lat}/{lon}) and the {CITY} text
-// token. The web UI resolves a city name to coordinates in the browser, so the
-// device only stores the result. Separate from the radar's own centre.
-struct LocationSettings {
-  String city;            // display name, printable ASCII (the theme font has no accents)
-  float  lat;             // latitude  (0,0 = not set yet)
-  float  lon;             // longitude
-
-  bool isSet() const { return lat != 0.0f || lon != 0.0f; }
-  void setDefaults();
-  void toJson(JsonObject o) const;
-  void fromJson(JsonObjectConst o);
-};
-
 // ---- Web UI password slice (device-wide) -----------------------------------
 // Off by default: the settings page is open on the LAN, as it always was.
 // Turning it on puts every page and every API endpoint behind HTTP digest auth,
@@ -224,7 +209,6 @@ struct Settings {
   RadarSettings   radar;
   HaSettings      ha;        // MQTT broker for HA screens
   ClockSettings   clock;
-  LocationSettings location; // theme {lat}/{lon}/{CITY}
   DisplaySettings display;   // panel colour correction
   WgSettings      wg;        // WireGuard tunnel (ESP32 targets)
   AuthSettings    auth;      // optional web UI password

@@ -36,22 +36,6 @@ vm.createContext(context);vm.runInContext(code,context);
  nodes.themeSelect.value='healthy';context.themeChoiceChanged();assert.equal(nodes.themeUseBtn.disabled,false);
  assert.equal(nodes.themeRemoveBtn.disabled,false);
  response={selected:'',freeBytes:65536,themes:[]};await context.loadThemes();assert.equal(nodes.themeUseBtn.disabled,true);
- // Location card: accent folding, geocoding search and picking a result.
- const locCode=html.slice(html.indexOf('// location: the browser'),html.indexOf('// wifi scan'));
- const loc={};for(const id of ['locQuery','locResults','locCity','locLat','locLon'])loc[id]={value:'',innerHTML:''};
- let geoUrl='',locToast='';
- const locContext={$:id=>loc[id],gv:id=>loc[id].value,sv:(id,value)=>loc[id].value=value,toast:m=>locToast=m,
-  esc:s=>String(s),encodeURIComponent,navigator:{language:'pt-BR'},
-  fetch:async url=>{geoUrl=url;return {ok:true,json:async()=>({results:[{name:'São Paulo',admin1:'São Paulo',country:'Brasil',latitude:-23.5475,longitude:-46.63611}]})}}};
- vm.createContext(locContext);vm.runInContext(locCode,locContext);
- assert.equal(locContext.asciiFold('São José dos Campos'),'Sao Jose dos Campos');
- assert.equal(locContext.asciiFold('x'.repeat(40)).length,32);
- locContext.locSearch();assert.match(locToast,/Type a city/);
- loc.locQuery.value='sao paulo';locContext.locSearch();await new Promise(resolve=>setImmediate(resolve));
- assert.match(geoUrl,/name=sao%20paulo/);assert.match(geoUrl,/language=pt/);
- assert.match(loc.locResults.innerHTML,/São Paulo, São Paulo, Brasil/);
- locContext.locPick(0);
- assert.equal(loc.locCity.value,'Sao Paulo');assert.equal(loc.locLat.value,'-23.5475');assert.equal(loc.locLon.value,'-46.6361');
  // The built-in theme is selectable but never removable, and a recovery is reported.
  response={selected:'',recovered:'big-theme',freeBytes:65536,themes:[{id:'',name:'Built-in clock',builtin:true,valid:true,bytes:0}]};
  await context.loadThemes();

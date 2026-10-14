@@ -35,8 +35,6 @@ Networks must be 2.4 GHz. If you cannot see your network in the scan, see [Troub
 
 **Colour**: the panels fitted to these devices are not all the same part, so the same firmware can look warm on one unit and green on another. Turn a channel down with the Red, Green, and Blue sliders until the screen matches what you expect; 100 percent on all three is the untouched image, and "Reset to 100%" puts it back. Two more fixes for panels that are wired differently: "Colour order" swaps red and blue for a unit that shows them the wrong way round, and "Invert the panel" is for a screen that looks like a photographic negative. Saving applies all of this immediately, so you can watch the screen while you adjust.
 
-**Location**: type your city and press Search, then pick the right one from the list; that fills in the name and coordinates. Theme clocks that show the city or the weather use it. You can also type the latitude and longitude yourself. The plane radar has its own position in its own tab.
-
 **Clock & night mode**: pick your timezone by name (for example `Europe/Zurich`) from the dropdown; daylight saving is applied automatically, you never touch it again. Turn on "Dim or blank the screen on a nightly schedule" to set a from-time, a to-time, and a night brightness, where 0 turns the backlight fully off and anything else just dims it. This needs the internet once, at the times it checks, to know what time it is; it does not need it constantly, and the device stays reachable through the night either way.
 
 ## Ticker

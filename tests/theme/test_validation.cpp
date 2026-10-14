@@ -77,22 +77,6 @@ int main() {
   deserializeJson(d,dataBase);d["data"][0]["url"]="http://example.test/weather.json";serializeJson(d,json);assert(parseTheme(json,theme,error));
   deserializeJson(d,dataBase);d["layers"][0]["value"]="{unknown.temp}";serializeJson(d,json);assert(!parseTheme(json,theme,error));
   deserializeJson(d,dataBase);d["data"][0]["url"]="https://";serializeJson(d,json);assert(!parseTheme(json,theme,error));
-  // Data URLs may carry only the {lat}/{lon} location placeholders.
-  deserializeJson(d,dataBase);d["data"][0]["url"]="http://example.test/w?latitude={lat}&longitude={lon}";serializeJson(d,json);assert(parseTheme(json,theme,error));
-  deserializeJson(d,dataBase);d["data"][0]["url"]="http://example.test/w?q={city}";serializeJson(d,json);assert(!parseTheme(json,theme,error));
-  assert(error.find("data[0].url:")==0);
-  deserializeJson(d,dataBase);d["data"][0]["url"]="http://example.test/w?latitude={lat";serializeJson(d,json);assert(!parseTheme(json,theme,error));
-  deserializeJson(d,dataBase);d["data"][0]["url"]="http://example.test/w?x=lat}";serializeJson(d,json);assert(!parseTheme(json,theme,error));
-  Location here;std::string url;
-  assert(expandDataUrl("http://example.test/w",here,url) && url=="http://example.test/w");
-  assert(!expandDataUrl("http://example.test/w?latitude={lat}",here,url));
-  here.set=true;here.lat=-22.90556;here.lon=-47.06083;
-  assert(expandDataUrl("http://example.test/w?latitude={lat}&longitude={lon}",here,url));
-  assert(url=="http://example.test/w?latitude=-22.9056&longitude=-47.0608");
-  // {CITY} is always a valid text token; it resolves from the CityKey value.
-  deserializeJson(d,base);d["layers"][0]["value"]="{CITY} {HH}";serializeJson(d,json);assert(parseTheme(json,theme,error));
-  assert(expandText("{CITY}",nullptr)=="--");
-  assert(expandText("{CITY}",nullptr,{{CityKey,"Campinas"}})=="Campinas");
   deserializeJson(d,dataBase);d["data"][0]["fields"][0]["path"]="main..temp";serializeJson(d,json);assert(!parseTheme(json,theme,error));
   deserializeJson(d,dataBase);d["data"]=42;serializeJson(d,json);assert(!parseTheme(json,theme,error));
   json.clear();deserializeJson(d,base);d["display"]["width"]=320;serializeJson(d,json);

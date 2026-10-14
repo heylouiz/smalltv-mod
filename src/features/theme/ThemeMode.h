@@ -70,7 +70,6 @@ class ThemeMode : public DisplayMode {
   }
  private:
   void unload();
-  void applyLocation(const Settings&);
   void refreshData();
   void renderBuiltin();
   smalltv::Engine engine_;
@@ -82,9 +81,7 @@ class ThemeMode : public DisplayMode {
   std::vector<smalltv::ThemeValue> dataValues_;
   smalltv::DataRequests dataRequests_;
   size_t dataCursor_ = 0;
-  smalltv::Location location_;
-  String city_;
-  bool attempted_ = false, messageDrawn_ = false, locationApplied_ = false;
+  bool attempted_ = false, messageDrawn_ = false;
   String recoveredId_, builtinIp_;
   int builtinMinute_ = -2;
   bool recovered_ = false;

@@ -135,9 +135,8 @@ python3 tools/smalltv_theme.py preview examples/themes/live-status \
   --data status.level=82 --data status.state=Warning
 ```
 
-Each key must reference a field declared in the theme's `data` block, or be
-`CITY` to stand in for the device's configured city (`--data CITY=Campinas`),
-exactly once; an unknown key, a missing `=`, an empty key, a duplicate key, or more than
+Each key must reference a field declared in the theme's `data` block, exactly
+once; an unknown key, a missing `=`, an empty key, a duplicate key, or more than
 32 values fails the command before it writes any output. Injected values only
 affect the preview frames; they cannot change package validation or which
 assets are read. `examples/themes/live-status` is the reference fixture for this
@@ -219,18 +218,6 @@ set `"insecureTls": true`; omitting it rejects the package instead of silently
 accepting unauthenticated TLS. Data fetching is owned by theme mode and does not
 affect notifications or other display modes.
 
-A URL may carry `{lat}` and `{lon}`, which the device fills from the
-**Location** card in the Display tab (four decimals) each time it fetches, so
-one theme works wherever it is installed:
-
-```json
-"url": "http://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m"
-```
-
-No other `{...}` placeholder is accepted in a URL. While no location is set, a
-source that uses them is skipped like a failed fetch and its fields show `--`;
-saving a location, or changing it, refetches every source at once.
-
 Installing a theme installs its data sources too: the device will periodically
 poll every URL the manifest declares, including addresses on your LAN. Only
 install themes from sources you trust — a manifest's `data` block is not
@@ -272,7 +259,6 @@ Month and weekday names are English; the device's configured timezone applies.
 | `{MON}` / `{MONTH}` | Abbreviated / full month |
 | `{WD}` / `{WEEKDAY}` | Abbreviated / full weekday |
 | `{YYYY}` | Year |
-| `{CITY}` | City name from the Display tab's Location card, `--` when unset |
 
 #### Scrolling text
 
