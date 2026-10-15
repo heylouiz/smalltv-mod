@@ -315,6 +315,19 @@ void HaSettings::toJson(JsonObject o, bool includeSecrets) const {
   o["dwellSec"]   = dwellSec;
 }
 
+void CompanionSettings::setDefaults() {
+  offlineSec = COMPANION_OFFLINE_SEC_DEFAULT;
+}
+
+void CompanionSettings::toJson(JsonObject o) const {
+  o["offlineSec"] = offlineSec;
+}
+
+void CompanionSettings::fromJson(JsonObjectConst o) {
+  if (o["offlineSec"].is<int>())
+    offlineSec = constrain((int)o["offlineSec"], COMPANION_OFFLINE_SEC_MIN, COMPANION_OFFLINE_SEC_MAX);
+}
+
 void HaSettings::fromJson(JsonObjectConst o) {
   if (o["brokerHost"].is<const char*>()) brokerHost = o["brokerHost"].as<String>();
   if (o["brokerPort"].is<int>())         brokerPort = constrain((int)o["brokerPort"], 1, 65535);
@@ -446,6 +459,7 @@ void Settings::setDefaults() {
   usage.setDefaults();
   radar.setDefaults();
   ha.setDefaults();
+  companion.setDefaults();
   clock.setDefaults();
   display.setDefaults();
   wg.setDefaults();
@@ -518,6 +532,7 @@ void settingsToJson(const Settings& s, JsonObject root, bool includeSecrets) {
                             : (s.mode == MODE_RADAR)    ? "radar"
                             : (s.mode == MODE_USAGE)    ? "usage"
                             : (s.mode == MODE_HA)       ? "ha"
+                            : (s.mode == MODE_COMPANION) ? "companion"
                             : (s.mode == MODE_CAROUSEL) ? "carousel" : "stocks";
   root["carouselSec"]       = s.carouselSec;
   root["carouselTicker"]    = s.carouselTicker;
@@ -535,6 +550,7 @@ void settingsToJson(const Settings& s, JsonObject root, bool includeSecrets) {
   s.usage.toJson(root["usage"].to<JsonObject>());
   s.radar.toJson(root["radar"].to<JsonObject>());
   s.ha.toJson(root["ha"].to<JsonObject>(), includeSecrets);
+  s.companion.toJson(root["companion"].to<JsonObject>());
   s.clock.toJson(root["clock"].to<JsonObject>());
   s.display.toJson(root["display"].to<JsonObject>());
   s.wg.toJson(root["wg"].to<JsonObject>(), includeSecrets);
@@ -591,6 +607,7 @@ void settingsApplyJson(Settings& s, JsonObjectConst root) {
            : m.equalsIgnoreCase("radar")    ? MODE_RADAR
            : m.equalsIgnoreCase("usage")    ? MODE_USAGE
            : m.equalsIgnoreCase("ha")       ? MODE_HA
+           : m.equalsIgnoreCase("companion") ? MODE_COMPANION
            : m.equalsIgnoreCase("carousel") ? MODE_CAROUSEL : MODE_STOCKS;
   }
   if (root["themeId"].is<const char*>()) {
@@ -625,6 +642,7 @@ void settingsApplyJson(Settings& s, JsonObjectConst root) {
   if (root["radar"].is<JsonObjectConst>()) s.radar.fromJson(root["radar"].as<JsonObjectConst>());
   // HA has no legacy flat layout either; only apply when its object is present.
   if (root["ha"].is<JsonObjectConst>()) s.ha.fromJson(root["ha"].as<JsonObjectConst>());
+  if (root["companion"].is<JsonObjectConst>()) s.companion.fromJson(root["companion"].as<JsonObjectConst>());
   if (root["clock"].is<JsonObjectConst>()) s.clock.fromJson(root["clock"].as<JsonObjectConst>());
   if (root["display"].is<JsonObjectConst>()) s.display.fromJson(root["display"].as<JsonObjectConst>());
   if (root["wg"].is<JsonObjectConst>()) s.wg.fromJson(root["wg"].as<JsonObjectConst>());

@@ -144,6 +144,7 @@
 #define MODE_NOTIFY    4             // transient overlay: armed over HTTP, never persisted
 #define MODE_THEME     6             // declarative installed clock faces
 #define MODE_HA        5             // Home Assistant screens pushed over MQTT
+#define MODE_COMPANION 7             // screens pushed by the PC companion app
 #define DEFAULT_MODE MODE_STOCKS
 #define DEFAULT_CAROUSEL_SEC 30      // per-mode dwell in carousel
 
@@ -402,3 +403,15 @@
 #ifndef WITH_THEME
 #define WITH_THEME 1
 #endif
+
+// ---------------------------------------------------------------------------
+// Companion (MODE_COMPANION, features/companion): a PC app composes the screen
+// and pushes RGB565 rectangles; the device only blits them, and keeps drawing
+// the clock itself so the PC has nothing to send while nothing changes.
+// ---------------------------------------------------------------------------
+#ifndef WITH_COMPANION
+#define WITH_COMPANION 1
+#endif
+#define COMPANION_OFFLINE_SEC_DEFAULT 120   // no request for this long -> offline screen
+#define COMPANION_OFFLINE_SEC_MIN      15
+#define COMPANION_OFFLINE_SEC_MAX    3600

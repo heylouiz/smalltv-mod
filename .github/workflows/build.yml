@@ -102,6 +102,7 @@ jobs:
           cmp examples/themes/live-status.stheme /tmp/live-status.stheme
           THEME_LIBDEPS=.pio/libdeps/smalltv_theme sh tests/theme/run.sh
           node tests/theme/test_webui.js
+          sh tests/companion/run.sh
 
       # Host-native, not board-specific: only needs ArduinoJson, which the
       # firmware build above already fetched into .pio/libdeps.

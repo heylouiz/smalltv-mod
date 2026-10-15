@@ -60,6 +60,7 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
  <button data-t="usage">Clawdmeter</button>
  <button data-t="radar">Radar</button>
  <button data-t="ha">Home Assistant</button>
+ <button data-t="companion">Companion</button>
  <button data-t="update">System</button>
 </nav>
 <main>
@@ -120,6 +121,7 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
     <option value="radar">Radar</option>
     <option value="ha">Home Assistant</option>
     <option value="theme">Theme clock</option>
+    <option value="companion">Companion app</option>
     <option value="carousel">Carousel (rotate modes)</option>
    </select>
    <div id="carouselRow">
@@ -319,6 +321,15 @@ small.hint{display:block;color:var(--mut);margin-top:4px;font-size:12px}
   </div>
  </section>
 
+ <!-- COMPANION (feature) -->
+ <section id="companion" class="tab">
+  <div class="card"><h2>Companion app</h2>
+   <div id="companionStatus" class="muted">Loading...</div>
+   <label>Show the offline screen after (s)</label><input id="companionOfflineSec" type="number" min="15" max="3600">
+   <small class="hint">A program on your computer composes the screen (music, notifications, Steam, system stats...) and pushes only the parts that change; the device keeps the clock ticking by itself. Pick <b>Companion app</b> as the mode in the Display tab, then on the computer: <code>pip install ./companion</code> and <code>smalltv-companion run --host &lt;this device&gt;</code>. If nothing arrives from the computer for the time above, the device shows its own clock until it comes back.</small>
+  </div>
+ </section>
+
  <!-- UPDATE -->
  <section id="update" class="tab">
   <div class="card"><h2>Update from GitHub</h2>
@@ -417,7 +428,7 @@ var TZMAP={
 function fillTz(){var s=$('tz');if(!s)return;var keys=Object.keys(TZMAP).filter(function(k){return k!==''});
  keys.sort();s.innerHTML='<option value="">UTC</option>'+keys.map(function(k){return '<option value="'+k+'">'+k+'</option>'}).join('');}
 
-var MODEOPT={ticker:'stocks',usage:'usage',radar:'radar',ha:'ha',theme:'theme'};
+var MODEOPT={ticker:'stocks',usage:'usage',radar:'radar',ha:'ha',theme:'theme',companion:'companion'};
 var CAROPT={ticker:'carouselTicker',usage:'carouselUsage',radar:'carouselRadar',ha:'carouselHa'};
 function hideFeat(name){
  var b=document.querySelector('nav button[data-t="'+name+'"]'); if(b)b.remove();
@@ -441,7 +452,8 @@ function setGain(id,lab,v){var n=(v!=null?v:100);sv(id,n);var e=$(lab);if(e)e.te
 function resetColors(){setGain('rGain','rgVal',100);setGain('gGain','ggVal',100);setGain('bGain','bgVal',100);
  toast('Gains reset — press Save settings to apply')}
 function loadConfig(){return j('/api/config').then(function(c){C=c;
- var f=c.features||{}; ['ticker','usage','radar','ha'].forEach(function(k){if(f[k]===false)hideFeat(k)});
+ var f=c.features||{}; ['ticker','usage','radar','ha','companion'].forEach(function(k){if(f[k]===false)hideFeat(k)});
+ sv('companionOfflineSec',(c.companion||{}).offlineSec||120);
  // WireGuard is only built for the chips with room for it; drop the card otherwise
  if(f.theme!==true){hideFeat('theme');var tc=$('themeCard');if(tc)tc.remove()}else{loadThemes()}
  if(f.wireguard===false){var wc=$('wgCard'); if(wc)wc.remove()}
@@ -612,6 +624,8 @@ function collect(){
  if($('ha')){var _h={brokerHost:gv('haBrokerHost'),brokerPort:parseInt(gv('haBrokerPort'))||1883,
   brokerUser:gv('haBrokerUser'),dwellSec:parseInt(gv('haDwellSec'))||15};
   var _hp=gv('haBrokerPass'); if(_hp)_h.brokerPass=_hp; o.ha=_h;}
+ // companion slice
+ if($('companion')) o.companion={offlineSec:parseInt(gv('companionOfflineSec'))||120};
  // clock slice
  if($('tz')){var _tzn=gv('tz'); var _tzp=(_tzn in TZMAP)?TZMAP[_tzn]:((C.clock&&C.clock.tz===_tzn&&C.clock.tzPosix)?C.clock.tzPosix:'UTC0');
   o.clock={tz:_tzn,tzPosix:_tzp,
@@ -842,5 +856,12 @@ function upload(){var f=$('fw').files[0];if(!f){toast('Pick a .bin first');retur
 
 loadConfig().then(loadStatus);
 setInterval(loadStatus,5000);
+// Companion tab: what the device last heard from the PC app.
+function loadCompanion(){if(!$('companion'))return;j('/api/companion/status').then(function(d){
+ var seen=d.lastSeenAgoS==null?'never':d.lastSeenAgoS+' s ago';
+ $('companionStatus').textContent=(d.active?(d.live?'On screen, showing the PC app':'On screen, waiting for the PC app'):'Not the active mode')
+  +' · last heard from it: '+seen+' · clock: '+(d.clock&&d.clock.enabled?(d.glyphs?'custom font':'built-in font'):'off');
+}).catch(function(){})}
+loadCompanion();setInterval(loadCompanion,5000);
 </script>
 </body></html>

@@ -153,6 +153,17 @@ struct HaSettings {
   void fromJson(JsonObjectConst o);
 };
 
+// ---- Companion feature slice -----------------------------------------------
+// Only the device-side policy lives here; what the screen shows (and where the
+// clock sits) is pushed by the companion app itself, see features/companion.
+struct CompanionSettings {
+  uint16_t offlineSec;    // no companion request for this long -> offline screen
+
+  void setDefaults();
+  void toJson(JsonObject o) const;
+  void fromJson(JsonObjectConst o);
+};
+
 // ---- Plane radar feature slice --------------------------------------------
 struct RadarSettings {
   float    lat;           // home latitude  (0,0 = not set yet)
@@ -190,7 +201,7 @@ struct Settings {
 
   // --- Active feature ---
   String themeId;       // installed .stheme ID; empty until selected
-  uint8_t mode;         // MODE_STOCKS / MODE_USAGE / MODE_RADAR / MODE_CAROUSEL / MODE_HA
+  uint8_t mode;         // MODE_STOCKS / MODE_USAGE / MODE_RADAR / MODE_CAROUSEL / MODE_HA / MODE_COMPANION
 
   // --- Carousel (mode == MODE_CAROUSEL): dwell + which features rotate ---
   uint16_t carouselSec;
@@ -208,6 +219,7 @@ struct Settings {
   UsageSettings   usage;
   RadarSettings   radar;
   HaSettings      ha;        // MQTT broker for HA screens
+  CompanionSettings companion; // PC companion app (pushed screens)
   ClockSettings   clock;
   DisplaySettings display;   // panel colour correction
   WgSettings      wg;        // WireGuard tunnel (ESP32 targets)

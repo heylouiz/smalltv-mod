@@ -25,6 +25,9 @@
 #if WITH_NOTIFY
 #include "NotifyMode.h"
 #endif
+#if WITH_COMPANION
+#include "features/companion/CompanionMode.h"
+#endif
 
 #if WITH_TICKER
 #include "TickerMode.h"
@@ -59,6 +62,9 @@ static DisplayMode* kModes[] = {
 #if WITH_THEME
   &g_themeMode,
 #endif
+#if WITH_COMPANION
+  &g_companionMode,
+#endif
 };
 static const size_t kModeCount = sizeof(kModes) / sizeof(kModes[0]);
 
@@ -77,6 +83,7 @@ static bool carouselHas(const Settings& s, const DisplayMode* m) {
     case MODE_HA:     return s.carouselHa;
 #endif
     case MODE_THEME:  return false; // explicitly selected, not in the existing carousel
+    case MODE_COMPANION: return false; // likewise: the PC app owns the whole screen
     default:          return true;
   }
 }
