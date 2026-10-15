@@ -54,6 +54,7 @@ export default defineConfig({
             { label: 'Theme clocks', link: '/features/themes/' },
             { label: 'SmallTV Studio editor', link: 'https://giovi321.github.io/smalltv-studio/' },
             { label: 'Home Assistant screens', link: '/features/ha/' },
+            { label: 'Companion app', link: '/features/companion/' },
           ],
         },
         {

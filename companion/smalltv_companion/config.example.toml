@@ -1,0 +1,70 @@
+# smalltv-companion config (~/.config/smalltv-companion/config.toml)
+# Coordinates are [x, y, w, h] on the 240x240 panel.
+
+[device]
+host = "192.168.50.9"        # or smalltv.local
+# user = "admin"             # only if the web UI has a password
+# password = ""
+heartbeat = 5                # seconds between "still here" pings
+
+[theme]
+background = "#101820"
+foreground = "#f0f0f0"
+muted = "#8a96a3"
+accent = "#1db954"
+panel = "#222c38"
+font = "DejaVu Sans"         # a path, or a fontconfig name ("Inter", "Inter:bold")
+font_bold = "DejaVu Sans:bold"
+
+# Drawn by the device itself, once a minute: the PC sends nothing to keep it
+# ticking. The digits are rendered here in this font and uploaded once.
+[clock]
+enabled = true
+box = [0, 0, 240, 64]
+font = "DejaVu Sans:bold"
+size = 52
+color = "#ffffff"
+# background = "#101820"     # default: theme background
+
+# Where notifications (and other interruptions) draw; default = below the clock.
+# [layout]
+# content = [0, 64, 240, 176]
+
+# Screens rotate; a screen whose plugins have nothing to show is skipped.
+[[screen]]
+name = "music"
+duration = 20
+  [[screen.widget]]
+  plugin = "media"
+  box = [0, 64, 240, 176]
+
+[[screen]]
+name = "steam"
+duration = 10
+  [[screen.widget]]
+  plugin = "steam"
+  box = [0, 64, 240, 176]
+
+[[screen]]
+name = "pc"
+duration = 10
+  [[screen.widget]]
+  plugin = "system"
+  box = [0, 64, 240, 176]
+
+[plugins.media]
+interval = 1
+show_paused = true
+# ignore = ["firefox"]
+
+[plugins.notifications]
+duration = 8
+ignore = []
+
+[plugins.system]
+interval = 3
+
+# [plugins.steam]
+# api_key = ""
+# steam_id = ""
+# interval = 60
