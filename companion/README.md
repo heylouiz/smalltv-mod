@@ -6,7 +6,7 @@ Composes the SmallTV's screen on your computer and pushes it to the device: musi
 pip install ./companion            # or pipx install ./companion
 smalltv-companion init             # ~/.config/smalltv-companion/config.toml
 smalltv-companion preview -o out.png
-smalltv-companion run -v
+smalltv-companion run --open      # settings + live preview at http://127.0.0.1:8765/
 ```
 
 On the device, choose **Companion app** in the Display tab.

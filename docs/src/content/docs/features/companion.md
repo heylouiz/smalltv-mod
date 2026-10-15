@@ -22,6 +22,14 @@ The feature is compiled into the ESP8266 theme image (`smalltv_theme`) and the E
    smalltv-companion run -v
    ```
 
+While it runs, the app serves a settings page at <http://127.0.0.1:8765/> (`--open` opens it, `--ui-port` moves it, `--no-ui` turns it off). The page has:
+- a live preview of what the device shows, and a draft preview of unsaved edits, rendered with the plugins' current data;
+- the notification duration and app filters, the theme colours and fonts, the clock's font, size, colours and area, the screens and their widgets, and each plugin's settings;
+- **Save & apply**, which writes `config.toml` and swaps the new settings in without a restart. Plugins whose settings did not change keep running, along with their state;
+- buttons to skip to the next screen and to send a test notification.
+
+The page listens on localhost only, because the config holds the device password and the Steam key. Saving rewrites the file, so comments in it are lost.
+
 `smalltv-companion preview -o out.png` renders the screen to a PNG without a device. Use it to try out layouts and fonts. `--screen <name>` picks one screen, and `--notify "text"` draws a sample notification.
 
 To start the app with your desktop session, use the systemd user unit in `companion/contrib/`. It runs inside your session so it can reach the session bus, which the music and notification plugins need.

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SmallTV Companion</title>
+<style>
+:root {
+  --bg: #f4f5f7; --card: #ffffff; --fg: #1c2330; --muted: #677285; --line: #dde1e7;
+  --accent: #1a8f4c; --accent-fg: #ffffff; --warn: #b4541a; --bad: #c0392b; --field: #ffffff;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11161d; --card: #1a212b; --fg: #e8ecf1; --muted: #8d98a8; --line: #2b3542;
+    --accent: #2fbf6c; --accent-fg: #0b1510; --warn: #e3924f; --bad: #ef6b5b; --field: #131921;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+  border-bottom: 1px solid var(--line); background: var(--card); position: sticky; top: 0; z-index: 5; }
+header h1 { font-size: 16px; margin: 0; font-weight: 650; }
+header .path { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+header .spacer { flex: 1; }
+main { display: grid; grid-template-columns: 520px 1fr; gap: 20px; padding: 20px; max-width: 1280px; margin: 0 auto; }
+@media (max-width: 980px) { main { grid-template-columns: 1fr; padding: 16px; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px; }
+.card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; font-weight: 650; }
+.preview-col { position: sticky; top: 76px; align-self: start; }
+@media (max-width: 980px) { .preview-col { position: static; } }
+.panel-wrap { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1; margin: 0 auto;
+  background: #000; border-radius: 14px; padding: 14px; box-shadow: 0 0 0 1px var(--line), 0 8px 24px rgba(0,0,0,.18); }
+.panel { position: relative; width: 100%; height: 100%; }
+.panel img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.panel .box { position: absolute; border: 2px dashed #ffcc33; pointer-events: none; display: none; }
+.mode { display: flex; gap: 8px; align-items: center; margin: 14px 0 8px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: transparent; color: var(--fg); padding: 6px 12px; }
+.seg button.on { background: var(--accent); color: var(--accent-fg); }
+.status { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.chip { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+.chip.ok { color: var(--accent); border-color: var(--accent); }
+.chip.bad { color: var(--bad); border-color: var(--bad); }
+.chip.warn { color: var(--warn); border-color: var(--warn); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 16px; }
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+label.f.check { flex-direction: row; align-items: center; gap: 8px; color: var(--fg); font-size: 14px; }
+input, select, textarea, button { font: inherit; color: var(--fg); }
+input[type=text], input[type=number], input[type=password], select, textarea {
+  background: var(--field); border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; width: 100%; min-width: 0; }
+textarea { resize: vertical; min-height: 54px; font-family: ui-monospace, monospace; font-size: 12px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.color { display: flex; gap: 6px; align-items: center; }
+.color input[type=color] { width: 38px; height: 32px; padding: 0; border: 1px solid var(--line); border-radius: 7px; background: none; flex: none; }
+.boxf { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.boxf input { padding: 6px 4px; text-align: center; }
+button { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+button.primary:disabled { opacity: .45; cursor: default; }
+button.small { padding: 3px 9px; font-size: 12px; }
+button.danger { color: var(--bad); }
+.screen { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.screen.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.screen-head { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+.screen-head .grow { flex: 1; min-width: 140px; }
+.widget { display: grid; grid-template-columns: 140px 1fr 1fr auto; gap: 8px; align-items: end; margin-top: 10px;
+  padding-top: 10px; border-top: 1px dashed var(--line); }
+@media (max-width: 640px) { .widget { grid-template-columns: 1fr; } }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+.plugin { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+.plugin:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+.plugin h3 { margin: 0 0 8px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--fg); color: var(--bg);
+  padding: 8px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
+.toast.show { opacity: 1; }
+.dirty { color: var(--warn); font-size: 12px; display: none; }
+.dirty.show { display: inline; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SmallTV Companion</h1>
+  <span class="path" id="path"></span>
+  <span class="spacer"></span>
+  <span class="dirty" id="dirty">Unsaved changes</span>
+  <button id="discard">Discard</button>
+  <button class="primary" id="save" disabled>Save &amp; apply</button>
+</header>
+
+<main>
+  <section class="preview-col">
+    <div class="card">
+      <div class="panel-wrap"><div class="panel">
+        <img id="preview" alt="Screen preview">
+        <div class="box" id="boxmark"></div>
+      </div></div>
+      <div class="mode">
+        <div class="seg">
+          <button id="m-live" class="on">Device (live)</button>
+          <button id="m-draft">Draft</button>
+        </div>
+        <select id="draft-what" style="width:auto"></select>
+      </div>
+      <div class="row">
+        <button id="skip">Next screen</button>
+        <button id="testnote">Send test notification</button>
+      </div>
+      <div class="status" id="status"></div>
+      <p class="hint">Live shows what the device shows now. Draft renders your unsaved edits with the plugins' current data.</p>
+    </div>
+  </section>
+
+  <section id="form"></section>
+</main>
+<datalist id="fonts"></datalist>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+let S = null;            // /api/state
+let M = null;            // the config being edited (config.toml as JSON)
+let dirty = false;
+let mode = "live";       // live | draft
+let selScreen = 0;       // screen whose widgets get outlined
+let selWidget = -1;
+let draftTimer = 0, liveTimer = 0, draftUrl = null;
+
+const PLUGINS = {
+  notifications: { title: "Notifications", fields: [
+    ["duration", "On screen (seconds)", "number", 8],
+    ["ignore", "Ignore apps (comma separated)", "list", []],
+    ["only", "Only these apps (comma separated, empty = all)", "list", []],
+  ], hint: "Interrupts any screen when a desktop notification arrives." },
+  media: { title: "Music / media", fields: [
+    ["interval", "Refresh (seconds)", "number", 1],
+    ["show_paused", "Keep showing a paused track", "bool", true],
+    ["ignore", "Ignore players (comma separated)", "list", []],
+  ] },
+  system: { title: "System", fields: [
+    ["interval", "Refresh (seconds)", "number", 3],
+    ["sensor", "Temperature sensor (psutil name, optional)", "text", ""],
+  ] },
+  steam: { title: "Steam", fields: [
+    ["api_key", "Web API key", "password", ""],
+    ["steam_id", "SteamID64", "text", ""],
+    ["interval", "Refresh (seconds)", "number", 60],
+    ["friends", "Show friends in game", "bool", true],
+  ], hint: "Key: steamcommunity.com/dev/apikey." },
+  text: { title: "Text", fields: [
+    ["text", "Text", "text", ""],
+    ["command", "Shell command (overrides the text)", "text", ""],
+    ["interval", "Refresh (seconds)", "number", 30],
+  ] },
+};
+
+// ---- helpers -------------------------------------------------------------
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600);
+}
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} :
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  return r;
+}
+function sec(name) { return (M[name] ??= {}); }
+function def(name, key) { return S.defaults[name]?.[key]; }
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "on") for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn);
+    else if (k === "class") e.className = v;
+    else if (v !== undefined && v !== null && v !== false) e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids) if (k != null) e.append(k);
+  return e;
+}
+// A [plugins.<name>] table enables that plugin even without a widget, so the
+// empty ones the form creates are dropped (notifications only runs that way).
+function cleaned() {
+  const out = structuredClone(M);
+  for (const [k, v] of Object.entries(out.plugins ?? {}))
+    if (k !== "notifications" && Object.keys(v).length === 0) delete out.plugins[k];
+  return out;
+}
+function changed() {
+  dirty = true;
+  $("#save").disabled = false;
+  $("#dirty").classList.add("show");
+  setMode("draft");
+  clearTimeout(draftTimer); draftTimer = setTimeout(renderDraft, 250);
+}
+
+// Field builders. `get`/`set` read and write the model; empty values are
+// removed so the file keeps only what differs from the defaults.
+function field(label, input) { return el("label", { class: "f" }, label, input); }
+function text(obj, key, label, placeholder, type = "text", list) {
+  const i = el("input", { type, value: obj[key] ?? "", placeholder: placeholder ?? "", list });
+  i.addEventListener("input", () => { if (i.value === "") delete obj[key]; else obj[key] = i.value; changed(); });
+  return field(label, i);
+}
+function num(obj, key, label, placeholder, step = "any") {
+  const i = el("input", { type: "number", value: obj[key] ?? "", placeholder: placeholder ?? "", step });
+  i.addEventListener("input", () => {
+    if (i.value === "") delete obj[key]; else obj[key] = Number(i.value); changed();
+  });
+  return field(label, i);
+}
+function bool(obj, key, label, dflt) {
+  const i = el("input", { type: "checkbox" });
+  i.checked = obj[key] ?? dflt;
+  i.addEventListener("change", () => { obj[key] = i.checked; changed(); });
+  return el("label", { class: "f check" }, i, label);
+}
+function color(obj, key, label, dflt) {
+  const val = () => obj[key] ?? dflt ?? "#000000";
+  const pick = el("input", { type: "color", value: val() });
+  const hex = el("input", { type: "text", value: obj[key] ?? "", placeholder: dflt ?? "" });
+  pick.addEventListener("input", () => { obj[key] = pick.value; hex.value = pick.value; changed(); });
+  hex.addEventListener("input", () => {
+    if (hex.value === "") { delete obj[key]; pick.value = dflt ?? "#000000"; changed(); return; }
+    if (/^#[0-9a-f]{6}$/i.test(hex.value)) { obj[key] = hex.value; pick.value = hex.value; changed(); }
+  });
+  return field(label, el("div", { class: "color" }, pick, hex));
+}
+function list(obj, key, label) {
+  const i = el("input", { type: "text", value: (obj[key] ?? []).join(", ") });
+  i.addEventListener("input", () => {
+    const v = i.value.split(",").map(s => s.trim()).filter(Boolean);
+    if (v.length) obj[key] = v; else delete obj[key]; changed();
+  });
+  return field(label, i);
+}
+function box(obj, key, label, dflt, onFocus) {
+  const cur = () => obj[key] ?? dflt;
+  const wrap = el("div", { class: "boxf" });
+  ["x", "y", "w", "h"].forEach((n, idx) => {
+    const i = el("input", { type: "number", min: 0, max: 240, value: cur()?.[idx] ?? "", title: n, placeholder: n });
+    i.addEventListener("focus", () => onFocus && onFocus());
+    i.addEventListener("input", () => {
+      const v = [...(cur() ?? [0, 0, 240, 240])]; v[idx] = Number(i.value || 0);
+      obj[key] = v; changed(); onFocus && onFocus();
+    });
+    wrap.append(i);
+  });
+  return field(label + " (x, y, w, h)", wrap);
+}
+
+// ---- form ------------------------------------------------------------------
+function build() {
+  const f = $("#form"); f.textContent = "";
+  const d = sec("device"), t = sec("theme"), c = sec("clock");
+  const notif = (M.plugins ??= {}).notifications ??= {};
+
+  f.append(el("div", { class: "card" }, el("h2", {}, "Notifications"),
+    el("div", { class: "grid" },
+      bool(notif, "enabled", "Show desktop notifications", true),
+      num(notif, "duration", "On screen (seconds)", 8, "1"),
+      list(notif, "ignore", "Ignore apps (comma separated)"),
+      list(notif, "only", "Only these apps (empty = all)")),
+    el("p", { class: "hint" }, "A notification takes over the area below the clock, then the rotation resumes where it was.")));
+
+  f.append(el("div", { class: "card" }, el("h2", {}, "Colours and fonts"),
+    el("div", { class: "grid" },
+      color(t, "background", "Background", def("theme", "background")),
+      color(t, "foreground", "Text", def("theme", "foreground")),
+      color(t, "muted", "Secondary text", def("theme", "muted")),
+      color(t, "accent", "Accent", def("theme", "accent")),
+      color(t, "panel", "Panels / bars", def("theme", "panel")),
+      text(t, "font", "Font", def("theme", "font"), "text", "fonts"),
+      text(t, "font_bold", "Bold font", def("theme", "font_bold"), "text", "fonts"))));
+
+  f.append(el("div", { class: "card" }, el("h2", {}, "Clock (drawn by the device)"),
+    el("div", { class: "grid" },
+      bool(c, "enabled", "Show the clock", true),
+      text(c, "font", "Font", def("clock", "font"), "text", "fonts"),
+      num(c, "size", "Size (px)", def("clock", "size"), "1"),
+      color(c, "color", "Digits", def("clock", "color")),
+      color(c, "background", "Background", t.background ?? def("theme", "background")),
+      box(c, "box", "Area", def("clock", "box"), () => markBox(M.clock.box ?? def("clock", "box")))),
+    el("p", { class: "hint" }, "The digits are rendered here in this font and uploaded once; the device ticks the minutes by itself.")));
+
+  f.append(screensCard());
+
+  const pc = el("div", { class: "card" }, el("h2", {}, "Plugins"));
+  for (const name of S.installed) {
+    if (name === "notifications") continue;
+    const spec = PLUGINS[name] ?? { title: name, fields: [["interval", "Refresh (seconds)", "number", ""]] };
+    const obj = M.plugins[name] ??= {};
+    const fields = spec.fields.map(([k, label, kind, dflt]) =>
+      kind === "number" ? num(obj, k, label, dflt) :
+      kind === "bool" ? bool(obj, k, label, dflt) :
+      kind === "list" ? list(obj, k, label) :
+      text(obj, k, label, dflt, kind === "password" ? "password" : "text"));
+    const run = S.running.plugins[name];
+    const chip = el("span", { class: "chip " + (run === undefined ? "" : run ? "ok" : "warn") },
+      run === undefined ? "not used" : run ? "has data" : "nothing to show");
+    pc.append(el("div", { class: "plugin" }, el("h3", {}, spec.title, chip),
+      el("div", { class: "grid" }, ...fields), spec.hint ? el("p", { class: "hint" }, spec.hint) : null));
+  }
+  f.append(pc);
+
+  f.append(el("div", { class: "card" }, el("h2", {}, "Device"),
+    el("div", { class: "grid" },
+      text(d, "host", "Address", "192.168.1.50"),
+      text(d, "user", "User", def("device", "user")),
+      text(d, "password", "Web UI password", "", "password"),
+      num(d, "heartbeat", "Heartbeat (seconds)", def("device", "heartbeat"))),
+    el("p", { class: "hint" }, "Changing the address needs a restart of the app.")));
+}
+
+function screensCard() {
+  const card = el("div", { class: "card" }, el("h2", {}, "Screens (rotate in order; empty ones are skipped)"));
+  const screens = M.screen ??= [];
+  screens.forEach((s, si) => {
+    s.widget ??= [];
+    const box = el("div", { class: "screen" + (si === selScreen ? " sel" : "") });
+    box.addEventListener("focusin", () => selectScreen(si));
+    box.addEventListener("click", () => selectScreen(si));
+    const name = el("input", { type: "text", value: s.name ?? "" });
+    name.addEventListener("input", () => { s.name = name.value; changed(); fillDraftWhat(); });
+    const up = el("button", { class: "small", title: "Move up", on: { click: e => { e.stopPropagation(); move(si, -1); } } }, "↑");
+    const down = el("button", { class: "small", title: "Move down", on: { click: e => { e.stopPropagation(); move(si, 1); } } }, "↓");
+    const del = el("button", { class: "small danger", on: { click: e => {
+      e.stopPropagation(); screens.splice(si, 1); selScreen = 0; changed(); build(); fillDraftWhat(); } } }, "Remove");
+    box.append(el("div", { class: "screen-head" },
+      el("div", { class: "grow" }, field("Name", name)),
+      el("div", { style: "width:120px" }, num(s, "duration", "Seconds", 10, "1")),
+      up, down, del));
+
+    s.widget.forEach((w, wi) => {
+      const sel = el("select");
+      for (const p of S.installed) sel.append(el("option", { value: p, selected: p === w.plugin }, p));
+      sel.addEventListener("change", () => { w.plugin = sel.value; changed(); });
+      const focus = () => { selectScreen(si); selWidget = wi; markBox(w.box ?? contentBox()); };
+      const opts = el("textarea", { rows: 1, placeholder: "optional, e.g. size = 28" });
+      opts.value = Object.entries(w).filter(([k]) => k !== "plugin" && k !== "box")
+        .map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join("\n");
+      opts.addEventListener("input", () => {
+        for (const k of Object.keys(w)) if (k !== "plugin" && k !== "box") delete w[k];
+        for (const line of opts.value.split("\n")) {
+          const m = line.match(/^\s*([A-Za-z_][\w-]*)\s*=\s*(.+?)\s*$/);
+          if (!m) continue;
+          try { w[m[1]] = JSON.parse(m[2]); } catch { w[m[1]] = m[2]; }
+        }
+        changed();
+      });
+      const rm = el("button", { class: "small danger", on: { click: () => { s.widget.splice(wi, 1); changed(); build(); } } }, "×");
+      box.append(el("div", { class: "widget" },
+        field("Plugin", sel),
+        box_(w, focus),
+        field("Options (key = value)", opts),
+        rm));
+    });
+    box.append(el("div", { class: "row", style: "margin-top:10px" },
+      el("button", { class: "small", on: { click: () => {
+        s.widget.push({ plugin: "text", box: contentBox() }); changed(); build(); } } }, "+ Widget")));
+    card.append(box);
+  });
+  card.append(el("button", { on: { click: () => {
+    screens.push({ name: "screen" + (screens.length + 1), duration: 10, widget: [{ plugin: "system", box: contentBox() }] });
+    selScreen = screens.length - 1; changed(); build(); fillDraftWhat();
+  } } }, "+ Screen"));
+  return card;
+}
+function box_(w, focus) { return box(w, "box", "Area", contentBox(), focus); }
+function move(i, dir) {
+  const s = M.screen, j = i + dir;
+  if (j < 0 || j >= s.length) return;
+  [s[i], s[j]] = [s[j], s[i]]; selScreen = j; changed(); build(); fillDraftWhat();
+}
+function contentBox() {
+  if (M.layout?.content) return M.layout.content;
+  const c = M.clock ?? {}, b = c.box ?? def("clock", "box");
+  if ((c.enabled ?? true) && b[0] === 0 && b[2] === 240) {
+    if (b[1] === 0) return [0, b[1] + b[3], 240, 240 - b[1] - b[3]];
+    if (b[1] + b[3] === 240) return [0, 0, 240, b[1]];
+  }
+  return [0, 0, 240, 240];
+}
+function selectScreen(i) {
+  if (selScreen === i) return;
+  selScreen = i;
+  document.querySelectorAll(".screen").forEach((e, k) => e.classList.toggle("sel", k === i));
+  const name = M.screen[i]?.name;
+  if (name && mode === "draft") { $("#draft-what").value = "screen:" + name; renderDraft(); }
+}
+function markBox(b) {
+  const m = $("#boxmark");
+  if (!b) { m.style.display = "none"; return; }
+  Object.assign(m.style, { display: "block", left: b[0] / 2.4 + "%", top: b[1] / 2.4 + "%",
+    width: b[2] / 2.4 + "%", height: b[3] / 2.4 + "%" });
+  clearTimeout(m._h); m._h = setTimeout(() => m.style.display = "none", 2500);
+}
+
+// ---- preview ---------------------------------------------------------------
+function fillDraftWhat() {
+  const s = $("#draft-what"), cur = s.value;
+  s.textContent = "";
+  s.append(el("option", { value: "" }, "First visible screen"));
+  for (const sc of M.screen ?? []) if (sc.name) s.append(el("option", { value: "screen:" + sc.name }, "Screen: " + sc.name));
+  s.append(el("option", { value: "notify" }, "A notification"));
+  s.value = [...s.options].some(o => o.value === cur) ? cur : "";
+  s.style.display = mode === "draft" ? "" : "none";
+}
+function setMode(m) {
+  if (mode === m) return;
+  mode = m;
+  $("#m-live").classList.toggle("on", m === "live");
+  $("#m-draft").classList.toggle("on", m === "draft");
+  $("#draft-what").style.display = m === "draft" ? "" : "none";
+  clearTimeout(liveTimer);
+  if (m === "live") pollLive(); else renderDraft();
+}
+async function renderDraft() {
+  if (mode !== "draft") return;
+  const what = $("#draft-what").value;
+  const body = { config: cleaned(), screen: what.startsWith("screen:") ? what.slice(7) : null, notify: what === "notify" };
+  const r = await api("/api/render", body);
+  if (!r.ok) { const e = await r.json().catch(() => ({})); toast(e.error || "Cannot render"); return; }
+  const url = URL.createObjectURL(await r.blob());
+  $("#preview").src = url;
+  if (draftUrl) URL.revokeObjectURL(draftUrl);
+  draftUrl = url;
+}
+function pollLive() {
+  if (mode !== "live") return;
+  const img = new Image();
+  img.onload = () => { $("#preview").src = img.src; };
+  img.src = "/live.png?t=" + Date.now();
+  liveTimer = setTimeout(pollLive, 1000);
+}
+async function refreshStatus() {
+  try {
+    const st = await (await api("/api/state")).json();
+    S.running = st.running;
+    const d = st.running.device, s = $("#status");
+    s.textContent = "";
+    s.append(
+      el("span", { class: "chip " + (d.error ? "bad" : d.active ? "ok" : "warn") },
+        d.error ? "Device unreachable" : d.active ? "Device showing companion" : "Device in another mode"),
+      el("span", { class: "chip" }, d.host || "no host"),
+      el("span", { class: "chip" }, "Now: " + (st.running.screen ?? "nothing to show")));
+    if (d.error) s.append(el("span", {}, d.error));
+  } catch { $("#status").textContent = "The companion app is not running."; }
+}
+
+// ---- actions -----------------------------------------------------------------
+async function load() {
+  S = await (await api("/api/state")).json();
+  M = structuredClone(S.config);
+  dirty = false;
+  $("#save").disabled = true;
+  $("#dirty").classList.remove("show");
+  $("#path").textContent = S.path;
+  build(); fillDraftWhat(); refreshStatus();
+}
+$("#save").addEventListener("click", async () => {
+  const r = await api("/api/config", { config: cleaned() });
+  const j = await r.json().catch(() => ({}));
+  if (!j.ok) { toast(j.error || "Save failed"); return; }
+  toast("Saved — applying to the device");
+  await load();
+  setMode("live");
+});
+$("#discard").addEventListener("click", async () => { await load(); setMode("live"); });
+$("#m-live").addEventListener("click", () => setMode("live"));
+$("#m-draft").addEventListener("click", () => setMode("draft"));
+$("#draft-what").addEventListener("change", renderDraft);
+$("#skip").addEventListener("click", async () => { await api("/api/skip", {}); setMode("live"); setTimeout(refreshStatus, 400); });
+$("#testnote").addEventListener("click", async () => {
+  const r = await api("/api/test-notify", { text: "Test notification" });
+  const j = await r.json().catch(() => ({}));
+  if (!j.ok) toast(j.error || "Failed"); else { setMode("live"); toast("Sent"); }
+});
+window.addEventListener("beforeunload", e => { if (dirty) e.preventDefault(); });
+
+api("/api/fonts").then(r => r.json()).then(list => {
+  const dl = $("#fonts");
+  for (const f of list) dl.append(el("option", { value: f }));
+});
+load().then(() => { pollLive(); setInterval(refreshStatus, 3000); });
+</script>
+</body>
+</html>

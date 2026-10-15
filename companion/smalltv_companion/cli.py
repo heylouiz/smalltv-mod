@@ -31,6 +31,17 @@ def cmd_run(args) -> int:
         print("no device: pass --host or set [device] host in", args.config or config.DEFAULT_PATH, file=sys.stderr)
         return 2
     app = App(cfg, Device(cfg.host, cfg.user, cfg.password))
+    if not args.no_ui:
+        from .webui import serve
+        try:
+            serve(app, Path(args.config) if args.config else config.DEFAULT_PATH, args.ui_port)
+            url = f"http://127.0.0.1:{args.ui_port}/"
+            print(f"settings and live preview: {url}", file=sys.stderr)
+            if args.open:
+                import webbrowser
+                webbrowser.open(url)
+        except OSError as e:
+            print(f"web UI not started (port {args.ui_port}: {e})", file=sys.stderr)
     try:
         asyncio.run(app.run(once=args.once))
     except KeyboardInterrupt:
@@ -104,6 +115,9 @@ def main(argv=None) -> None:
     r.add_argument("--host", help="device address (overrides the config)")
     r.add_argument("--password", help="web UI password, if the device has one")
     r.add_argument("--once", action="store_true", help="push one frame and exit")
+    r.add_argument("--ui-port", type=int, default=8765, help="port of the local settings page (default 8765)")
+    r.add_argument("--no-ui", action="store_true", help="do not serve the settings page")
+    r.add_argument("--open", action="store_true", help="open the settings page in the browser")
     r.set_defaults(fn=cmd_run)
 
     p = sub.add_parser("preview", help="render the screen to a PNG without a device")

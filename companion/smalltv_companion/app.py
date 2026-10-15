@@ -48,17 +48,90 @@ class App:
         self.shown: np.ndarray | None = None    # what the device shows now (None = unknown)
         self.epoch: int | None = None
         self.device_active = False
+        self.last_error = ""
+        self.last_frame: Image.Image | None = None   # the newest composed frame (for the web UI)
         self._dirty: asyncio.Event | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._tasks: dict[str, asyncio.Task] = {}
+        self._pending: Config | None = None
 
     # -- plugins -----------------------------------------------------------
-    def _make_plugins(self) -> dict[str, Plugin]:
+    def _make_plugins(self, names=None) -> dict[str, Plugin]:
         out = {}
-        for name in sorted(self.cfg.used_plugins()):
+        for name in sorted(self.cfg.used_plugins() if names is None else names):
             try:
                 out[name] = plugin_class(name)(self.cfg.plugins.get(name, {}))
             except Exception as e:  # a broken plugin must not take the others down
                 log.error("plugin %s disabled: %s", name, e)
         return out
+
+    async def _start_plugin(self, p: Plugin) -> None:
+        loop = asyncio.get_running_loop()
+        p._notify = lambda: loop.call_soon_threadsafe(self._mark_dirty)
+        try:
+            await p.start()
+        except Exception as e:
+            log.error("plugin %s failed to start: %s", p.name, e)
+        if p.interval > 0:
+            self._tasks[p.name] = asyncio.create_task(self._poll_loop(p))
+
+    async def _stop_plugin(self, name: str) -> None:
+        task = self._tasks.pop(name, None)
+        if task:
+            task.cancel()
+        try:
+            await self.plugins[name].stop()
+        except Exception:
+            pass
+
+    # -- live changes (called from other threads: the web UI) -----------------
+    def _call(self, fn) -> None:
+        if self._loop is None:
+            fn()
+        else:
+            self._loop.call_soon_threadsafe(fn)
+
+    def request_reload(self, cfg: Config) -> None:
+        """Applies a new config at the next loop iteration, without a restart."""
+        def go():
+            self._pending = cfg
+            self._mark_dirty()
+        self._call(go)
+
+    def request_skip(self) -> None:
+        """Moves the rotation on to the next screen (or ends an interruption)."""
+        def go():
+            if self.active:
+                self.active = None
+            else:
+                self.screen_idx += 1
+                self.screen_since = time.monotonic()
+            self._mark_dirty()
+        self._call(go)
+
+    async def _apply(self, cfg: Config) -> bool:
+        """Swaps in `cfg`; plugins whose settings did not change keep running
+        (and keep their state: recent notifications, the current track).
+        Returns True when the clock has to be set up on the device again."""
+        old, self.cfg = self.cfg, cfg
+        wanted = cfg.used_plugins()
+        for name in list(self.plugins):
+            if name not in wanted or old.plugins.get(name, {}) != cfg.plugins.get(name, {}):
+                await self._stop_plugin(name)
+                del self.plugins[name]
+        fresh = self._make_plugins(wanted - set(self.plugins))
+        self.plugins.update(fresh)
+        for p in fresh.values():
+            await self._start_plugin(p)
+        if self.active and self.plugins.get(self.active.plugin.name) is not self.active.plugin:
+            self.active = None
+        self.screen_idx, self.screen_since = 0, time.monotonic()
+        new_bg = cfg.clock.background or cfg.theme.background
+        clock_changed = old.clock != cfg.clock or new_bg != self.clock_bg
+        self.clock_bg = new_bg
+        if clock_changed:
+            self.shown = None
+        return clock_changed
 
     def _mark_dirty(self) -> None:
         if self._dirty is not None:
@@ -153,7 +226,10 @@ class App:
 
     def preview(self) -> Image.Image:
         """compose() plus the clock as the device would draw it."""
-        img = self.compose()
+        return self.with_clock(self.compose())
+
+    def with_clock(self, img: Image.Image) -> Image.Image:
+        img = img.copy()
         c = self.cfg.clock
         if c.enabled:
             atlas = glyphs.render_glyphs(load_font(c.font, c.size), c.color, self.clock_bg)
@@ -200,20 +276,19 @@ class App:
     # -- main loop ------------------------------------------------------------------
     async def run(self, once: bool = False) -> None:
         self._dirty = asyncio.Event()
-        loop = asyncio.get_running_loop()
-        for p in self.plugins.values():
-            p._notify = lambda: loop.call_soon_threadsafe(self._mark_dirty)
-            try:
-                await p.start()
-            except Exception as e:
-                log.error("plugin %s failed to start: %s", p.name, e)
-        tasks = [asyncio.create_task(self._poll_loop(p)) for p in self.plugins.values() if p.interval > 0]
+        self._loop = asyncio.get_running_loop()
+        for p in list(self.plugins.values()):
+            await self._start_plugin(p)
         clock_ready = False
         last_hb = 0.0
         backoff = 1.0
         try:
             while True:
                 now = time.monotonic()
+                if self._pending is not None:
+                    cfg, self._pending = self._pending, None
+                    if await self._apply(cfg):
+                        clock_ready = False
                 try:
                     if not clock_ready:
                         await asyncio.to_thread(self.setup_clock)
@@ -222,15 +297,20 @@ class App:
                         await asyncio.to_thread(self.heartbeat)
                         last_hb = now
                     self.collect_interrupts(now)
+                    img = self.compose(now)
+                    self.last_frame = img
                     if self.device_active:
-                        frame = to_array(self.compose(now))
+                        frame = to_array(img)
                         t0 = time.monotonic()
                         n = await asyncio.to_thread(self.push, frame)
                         if n:
                             log.debug("pushed %d rect(s) in %.2fs", n, time.monotonic() - t0)
                     backoff = 1.0
+                    self.last_error = ""
                 except Exception as e:
                     log.warning("device unreachable (%s); retrying in %.0fs", e, backoff)
+                    self.last_error = str(e)
+                    self.last_frame = self.compose(time.monotonic())
                     self.shown = None
                     self.epoch = None
                     await asyncio.sleep(backoff)
@@ -245,10 +325,5 @@ class App:
                     pass
                 self._dirty.clear()
         finally:
-            for t in tasks:
-                t.cancel()
-            for p in self.plugins.values():
-                try:
-                    await p.stop()
-                except Exception:
-                    pass
+            for name in list(self.plugins):
+                await self._stop_plugin(name)

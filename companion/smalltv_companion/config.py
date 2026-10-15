@@ -117,9 +117,49 @@ def parse(data: dict) -> Config:
     return cfg
 
 
-def load(path: Path | None = None) -> Config:
+def load_raw(path: Path | None = None) -> dict:
     p = Path(path) if path else DEFAULT_PATH
     if not p.exists():
-        return parse({})
+        return {}
     with open(p, "rb") as f:
-        return parse(tomllib.load(f))
+        return tomllib.load(f)
+
+
+def load(path: Path | None = None) -> Config:
+    return parse(load_raw(path))
+
+
+SAVED_HEADER = """\
+# smalltv-companion config, saved by the web UI (smalltv-companion run --ui).
+# Hand edits are fine, but comments are not kept when the UI saves again.
+# Every key is documented in config.example.toml in the package.
+
+"""
+
+
+def save_raw(data: dict, path: Path | None = None) -> Config:
+    """Validates `data` (raises ValueError) and writes it as TOML."""
+    import tomli_w
+    cfg = parse(data)
+    p = Path(path) if path else DEFAULT_PATH
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(SAVED_HEADER + tomli_w.dumps(data))
+    tmp.replace(p)
+    return cfg
+
+
+def hex_color(rgb) -> str:
+    return "#%02x%02x%02x" % tuple(rgb)
+
+
+def defaults() -> dict:
+    """The values parse() assumes for missing keys, in config-file form."""
+    t, c = Theme(), ClockConfig()
+    return {
+        "device": {"user": "admin", "heartbeat": Config.heartbeat},
+        "theme": {k: hex_color(getattr(t, k)) for k in ("background", "foreground", "muted", "accent", "panel")}
+                 | {"font": t.font, "font_bold": t.font_bold},
+        "clock": {"enabled": c.enabled, "box": [c.box.x, c.box.y, c.box.w, c.box.h], "font": c.font,
+                  "size": c.size, "color": hex_color(c.color)},
+    }
